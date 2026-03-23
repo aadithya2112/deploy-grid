@@ -3,6 +3,10 @@ import type { BuildJob } from "../db/schema.ts";
 import { buildJobs } from "../db/schema.ts";
 import { db, sql as postgresClient } from "../infrastructure/database.ts";
 
+function toTimestamp(value: Date): string {
+  return value.toISOString();
+}
+
 export interface ClaimBuildJobInput {
   jobId: string;
   claimedBy: string;
@@ -37,17 +41,17 @@ export class BuildJobRepository {
       set
         status = 'running',
         claimed_by = ${input.claimedBy},
-        lease_until = ${input.leaseUntil},
+        lease_until = ${toTimestamp(input.leaseUntil)},
         attempts = attempts + 1,
         last_error = null,
-        updated_at = ${input.now}
+        updated_at = ${toTimestamp(input.now)}
       where id = ${input.jobId}
         and attempts < ${input.maxAttempts}
         and (
           status = 'queued'
           or (
             status = 'running'
-            and (lease_until is null or lease_until < ${input.now})
+            and (lease_until is null or lease_until < ${toTimestamp(input.now)})
           )
         )
       returning *
@@ -65,8 +69,8 @@ export class BuildJobRepository {
     const [job] = await postgresClient<BuildJob[]>`
       update build_jobs
       set
-        lease_until = ${leaseUntil},
-        updated_at = ${now}
+        lease_until = ${toTimestamp(leaseUntil)},
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
         and status = 'running'
         and claimed_by = ${claimedBy}
@@ -83,7 +87,7 @@ export class BuildJobRepository {
         status = 'succeeded',
         lease_until = null,
         last_error = null,
-        updated_at = ${now}
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
         and claimed_by = ${claimedBy}
     `;
@@ -101,7 +105,7 @@ export class BuildJobRepository {
         status = 'failed',
         lease_until = null,
         last_error = ${lastError},
-        updated_at = ${now}
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
         and claimed_by = ${claimedBy}
     `;
@@ -134,7 +138,7 @@ export class BuildJobRepository {
           and d.status in ('queued', 'building')
           and bj.attempts < ${input.maxAttempts}
           and bj.lease_until is not null
-          and bj.lease_until < ${input.now}
+          and bj.lease_until < ${toTimestamp(input.now)}
         order by bj.updated_at asc
         limit ${input.limit}
       `,
@@ -157,7 +161,7 @@ export class BuildJobRepository {
         where bj.status = 'queued'
           and d.status = 'queued'
           and bj.attempts < ${input.maxAttempts}
-          and bj.updated_at < ${input.staleQueuedBefore}
+          and bj.updated_at < ${toTimestamp(input.staleQueuedBefore)}
         order by bj.updated_at asc
         limit ${input.limit}
       `,
@@ -179,7 +183,7 @@ export class BuildJobRepository {
       where status = 'running'
         and attempts >= ${maxAttempts}
         and lease_until is not null
-        and lease_until < ${now}
+        and lease_until < ${toTimestamp(now)}
     `;
   }
 
@@ -187,8 +191,8 @@ export class BuildJobRepository {
     await postgresClient`
       update build_jobs
       set
-        lease_until = ${now},
-        updated_at = ${now}
+        lease_until = ${toTimestamp(now)},
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
         and claimed_by = ${claimedBy}
         and status = 'running'

@@ -3,6 +3,10 @@ import type { Deployment } from "../db/schema.ts";
 import { deployments } from "../db/schema.ts";
 import { db, sql as postgresClient } from "../infrastructure/database.ts";
 
+function toTimestamp(value: Date): string {
+  return value.toISOString();
+}
+
 export class DeploymentRepository {
   async findById(id: string): Promise<Deployment | null> {
     const [deployment] = await db
@@ -19,9 +23,9 @@ export class DeploymentRepository {
       update deployments
       set
         status = 'building',
-        build_started_at = coalesce(build_started_at, ${now}),
+        build_started_at = coalesce(build_started_at, ${toTimestamp(now)}),
         error_message = null,
-        updated_at = ${now}
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
         and status in ('queued', 'building')
     `;
@@ -32,7 +36,7 @@ export class DeploymentRepository {
       update deployments
       set
         commit_sha = ${commitSha},
-        updated_at = ${now}
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
     `;
   }
@@ -48,8 +52,8 @@ export class DeploymentRepository {
         commit_sha = ${input.commitSha},
         artifact_url = ${input.artifactUrl},
         error_message = null,
-        build_finished_at = ${input.now},
-        updated_at = ${input.now}
+        build_finished_at = ${toTimestamp(input.now)},
+        updated_at = ${toTimestamp(input.now)}
       where id = ${id}
     `;
   }
@@ -60,8 +64,8 @@ export class DeploymentRepository {
       set
         status = 'failed',
         error_message = ${errorMessage},
-        build_finished_at = ${now},
-        updated_at = ${now}
+        build_finished_at = ${toTimestamp(now)},
+        updated_at = ${toTimestamp(now)}
       where id = ${id}
     `;
   }
