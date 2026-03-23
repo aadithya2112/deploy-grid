@@ -19,4 +19,6 @@ export const env = {
   port: Number(runtimeEnv.PORT ?? 3000),
   deploymentPreviewBaseUrl:
     runtimeEnv.DEPLOYMENT_PREVIEW_BASE_URL?.replace(/\/+$/, "") ?? null,
+  apiAuthToken: runtimeEnv.API_AUTH_TOKEN ?? null,
+  projectEnvEncryptionKey: runtimeEnv.PROJECT_ENV_ENCRYPTION_KEY ?? null,
 };

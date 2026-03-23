@@ -4,9 +4,21 @@ import {
   DeploymentProjectNotFoundError,
   type DeploymentService,
 } from "../services/deployment.service.ts";
+import {
+  RequestValidationError,
+  optionalNonNegativeIntParam,
+  optionalString,
+  parseJsonBody,
+  parsePagination,
+  requireString,
+} from "../http/validation.ts";
 
 interface CreateDeploymentBody {
   repoUrl?: string;
+  gitRef?: string;
+}
+
+interface RedeployDeploymentBody {
   gitRef?: string;
 }
 
@@ -15,39 +27,25 @@ export class DeploymentController {
 
   async create(request: Request): Promise<Response> {
     try {
-      const body = (await request.json()) as CreateDeploymentBody;
-
-      if (typeof body.repoUrl !== "string") {
-        return Response.json(
-          { error: "repoUrl must be a string" },
-          { status: 400 },
-        );
-      }
-
-      if (body.gitRef !== undefined && typeof body.gitRef !== "string") {
-        return Response.json(
-          { error: "gitRef must be a string" },
-          { status: 400 },
-        );
-      }
+      const body = await parseJsonBody<CreateDeploymentBody>(request);
 
       const deployment = await this.deploymentService.createDeployment(
-        body.repoUrl,
-        body.gitRef,
+        requireString(body.repoUrl, "repoUrl"),
+        optionalString(body.gitRef, "gitRef"),
       );
 
       return Response.json(deployment.toJSON(), { status: 202 });
     } catch (error: unknown) {
-      if (error instanceof SyntaxError) {
-        return Response.json({ error: "Invalid request body" }, { status: 400 });
-      }
-
       if (error instanceof InvalidDeploymentRequestError) {
         return Response.json({ error: error.message }, { status: 400 });
       }
 
       if (error instanceof DeploymentProjectNotFoundError) {
         return Response.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof RequestValidationError) {
+        return Response.json({ error: error.message }, { status: 400 });
       }
 
       const message =
@@ -67,6 +65,10 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 404 });
       }
 
+      if (error instanceof RequestValidationError) {
+        return Response.json({ error: error.message }, { status: 400 });
+      }
+
       const message = error instanceof Error ? error.message : "Unknown error";
       return Response.json({ error: message }, { status: 500 });
     }
@@ -75,30 +77,18 @@ export class DeploymentController {
   async getLogs(request: Request, id: string): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const limit = Number(url.searchParams.get("limit") ?? "100");
-      const afterSequence = url.searchParams.get("afterSequence");
-
-      if (!Number.isFinite(limit) || limit <= 0) {
-        return Response.json(
-          { error: "limit must be a positive number" },
-          { status: 400 },
-        );
-      }
-
-      if (
-        afterSequence !== null &&
-        (!Number.isFinite(Number(afterSequence)) || Number(afterSequence) < 0)
-      ) {
-        return Response.json(
-          { error: "afterSequence must be a non-negative number" },
-          { status: 400 },
-        );
-      }
+      const { limit } = parsePagination(url.searchParams, {
+        defaultLimit: 100,
+        maxLimit: 500,
+      });
+      const afterSequence = optionalNonNegativeIntParam(
+        url.searchParams,
+        "afterSequence",
+      );
 
       const logs = await this.deploymentService.getDeploymentLogs(id, {
         limit,
-        afterSequence:
-          afterSequence === null ? undefined : Number(afterSequence),
+        afterSequence,
       });
 
       return Response.json({
@@ -115,6 +105,35 @@ export class DeploymentController {
     } catch (error: unknown) {
       if (error instanceof DeploymentNotFoundError) {
         return Response.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof RequestValidationError) {
+        return Response.json({ error: error.message }, { status: 400 });
+      }
+
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return Response.json({ error: message }, { status: 500 });
+    }
+  }
+
+  async redeploy(request: Request, id: string): Promise<Response> {
+    try {
+      const body = await parseJsonBody<RedeployDeploymentBody>(request, {
+        allowEmpty: true,
+      });
+      const deployment = await this.deploymentService.redeployDeployment(
+        id,
+        optionalString(body.gitRef, "gitRef"),
+      );
+
+      return Response.json(deployment.toJSON(), { status: 202 });
+    } catch (error: unknown) {
+      if (error instanceof DeploymentNotFoundError) {
+        return Response.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error instanceof RequestValidationError) {
+        return Response.json({ error: error.message }, { status: 400 });
       }
 
       const message = error instanceof Error ? error.message : "Unknown error";

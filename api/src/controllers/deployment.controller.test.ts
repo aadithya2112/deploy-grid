@@ -285,4 +285,32 @@ describe("DeploymentController", () => {
       error: "limit must be a positive number",
     });
   });
+
+  test("re-deploys an existing deployment", async () => {
+    const deployment = Deployment.create({
+      projectId: "project-123",
+      repoUrl: "https://github.com/acme/react-app.git",
+      gitRef: "release",
+    });
+    const service = {
+      redeployDeployment: async (id: string, gitRef?: string) => {
+        expect(id).toBe("deployment-123");
+        expect(gitRef).toBe("release");
+        return deployment;
+      },
+    };
+    const controller = new DeploymentController(service as never);
+
+    const response = await controller.redeploy(
+      new Request("http://localhost/deployments/deployment-123/redeploy", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gitRef: "release" }),
+      }),
+      "deployment-123",
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual(deployment.toJSON());
+  });
 });

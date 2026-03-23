@@ -72,19 +72,59 @@ describe("ProjectController", () => {
 
   test("lists projects with pagination", async () => {
     const service = {
-      listProjects: async (options: { limit: number; offset: number }) => {
-        expect(options).toEqual({ limit: 10, offset: 5 });
-        return [];
+      listProjects: async (options: {
+        limit: number;
+        offset: number;
+        query?: string;
+      }) => {
+        expect(options).toEqual({ limit: 11, offset: 5, query: "react" });
+        return [
+          {
+            id: "project-123",
+            slug: "react-app-123abc",
+            name: "react-app",
+            repoUrl: "https://github.com/acme/react-app.git",
+            defaultBranch: "main",
+            rootDirectory: null,
+            installCommand: null,
+            buildCommand: null,
+            outputDirectory: null,
+            createdAt: "2025-01-01T00:00:00.000Z",
+            updatedAt: "2025-01-01T00:00:00.000Z",
+          },
+        ];
       },
     };
     const controller = new ProjectController(service as never);
 
     const response = await controller.list(
-      new Request("http://localhost/projects?limit=10&offset=5"),
+      new Request("http://localhost/projects?limit=10&offset=5&query=react"),
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ projects: [] });
+    expect(await response.json()).toEqual({
+      projects: [
+        {
+          id: "project-123",
+          slug: "react-app-123abc",
+          name: "react-app",
+          repoUrl: "https://github.com/acme/react-app.git",
+          defaultBranch: "main",
+          rootDirectory: null,
+          installCommand: null,
+          buildCommand: null,
+          outputDirectory: null,
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-01T00:00:00.000Z",
+        },
+      ],
+      pageInfo: {
+        limit: 10,
+        offset: 5,
+        hasMore: false,
+        nextOffset: null,
+      },
+    });
   });
 
   test("returns 404 when a project is not found", async () => {
@@ -129,6 +169,42 @@ describe("ProjectController", () => {
 
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual(deployment.toJSON());
+  });
+
+  test("updates a project", async () => {
+    const service = {
+      updateProject: async (projectId: string, input: { defaultBranch?: string }) => {
+        expect(projectId).toBe("project-123");
+        expect(input.defaultBranch).toBe("develop");
+        return {
+          id: "project-123",
+          slug: "react-app-123abc",
+          name: "react-app",
+          repoUrl: "https://github.com/acme/react-app.git",
+          defaultBranch: "develop",
+          rootDirectory: null,
+          installCommand: null,
+          buildCommand: null,
+          outputDirectory: null,
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-02T00:00:00.000Z",
+        };
+      },
+    };
+    const controller = new ProjectController(service as never);
+
+    const response = await controller.update(
+      new Request("http://localhost/projects/project-123", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ defaultBranch: "develop" }),
+      }),
+      "project-123",
+    );
+
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { defaultBranch: string };
+    expect(json.defaultBranch).toBe("develop");
   });
 
   test("lists env vars with masked values", async () => {
@@ -182,6 +258,60 @@ describe("ProjectController", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
       error: "value must be a string",
+    });
+  });
+
+  test("lists deployments with filters and page info", async () => {
+    const service = {
+      listDeployments: async (
+        projectId: string,
+        options: {
+          limit: number;
+          offset: number;
+          status?: "ready";
+          gitRef?: string;
+        },
+      ) => {
+        expect(projectId).toBe("project-123");
+        expect(options).toEqual({
+          limit: 11,
+          offset: 0,
+          status: "ready",
+          gitRef: "main",
+        });
+
+        return [
+          Deployment.create({
+            projectId,
+            repoUrl: "https://github.com/acme/react-app.git",
+            gitRef: "main",
+          }),
+        ];
+      },
+    };
+    const controller = new ProjectController(service as never);
+
+    const response = await controller.listDeployments(
+      new Request(
+        "http://localhost/projects/project-123/deployments?limit=10&status=ready&gitRef=main",
+      ),
+      "project-123",
+    );
+
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as {
+      pageInfo: {
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+        nextOffset: number | null;
+      };
+    };
+    expect(json.pageInfo).toEqual({
+      limit: 10,
+      offset: 0,
+      hasMore: false,
+      nextOffset: null,
     });
   });
 

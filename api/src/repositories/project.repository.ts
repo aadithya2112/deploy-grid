@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, ilike, or } from "drizzle-orm";
 import type { NewProject, Project } from "../db/schema.ts";
 import { projects } from "../db/schema.ts";
 import { db } from "../infrastructure/database.ts";
@@ -77,7 +77,28 @@ export class ProjectRepository {
     return project ?? null;
   }
 
-  async list(options: { limit: number; offset: number }): Promise<Project[]> {
+  async list(options: {
+    limit: number;
+    offset: number;
+    query?: string;
+  }): Promise<Project[]> {
+    if (options.query?.trim()) {
+      const search = `%${options.query.trim()}%`;
+      return db
+        .select()
+        .from(projects)
+        .where(
+          or(
+            ilike(projects.name, search),
+            ilike(projects.slug, search),
+            ilike(projects.repoUrl, search),
+          ),
+        )
+        .orderBy(asc(projects.createdAt))
+        .limit(options.limit)
+        .offset(options.offset);
+    }
+
     return db
       .select()
       .from(projects)

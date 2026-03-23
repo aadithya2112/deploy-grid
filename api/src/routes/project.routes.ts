@@ -70,10 +70,16 @@ export class ProjectRoutes {
 
     const projectRoute = /^\/projects\/([^/]+)$/.exec(url.pathname);
 
-    if (request.method === "GET" && projectRoute) {
+    if (projectRoute) {
       const [, id] = projectRoute;
       if (id) {
-        return this.controller.getById(id);
+        if (request.method === "GET") {
+          return this.controller.getById(id);
+        }
+
+        if (request.method === "PATCH") {
+          return this.controller.update(request, id);
+        }
       }
     }
 

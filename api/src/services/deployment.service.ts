@@ -131,7 +131,12 @@ export class DeploymentService {
 
   async listDeploymentsByProject(
     projectId: string,
-    options: { limit: number; offset: number },
+    options: {
+      limit: number;
+      offset: number;
+      status?: import("../domain/deployment.types.ts").DeploymentStatus;
+      gitRef?: string;
+    },
   ): Promise<Deployment[]> {
     return this.repo.listByProjectId(projectId, options);
   }
@@ -142,6 +147,11 @@ export class DeploymentService {
   ) {
     await this.requireDeployment(id);
     return this.deploymentLogRepo.listByDeploymentId(id, options);
+  }
+
+  async redeployDeployment(id: string, gitRef?: string): Promise<Deployment> {
+    const deployment = await this.requireDeployment(id);
+    return this.createDeploymentForProject(deployment.projectId, gitRef ?? deployment.gitRef);
   }
 
   private async requireDeployment(id: string): Promise<Deployment> {

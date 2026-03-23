@@ -2,6 +2,7 @@ import { env } from "./config/env.ts";
 import { DeploymentController } from "./controllers/deployment.controller.ts";
 import { HealthController } from "./controllers/health.controller.ts";
 import { ProjectController } from "./controllers/project.controller.ts";
+import { authorizeRequest } from "./http/auth.ts";
 import { logger } from "./infrastructure/logger.ts";
 import { BuildJobRepository } from "./repositories/build-job.repository.ts";
 import { DeploymentRepository } from "./repositories/deployment.repository.ts";
@@ -47,6 +48,12 @@ const port = env.port;
 const server = Bun.serve({
   port,
   async fetch(request: Request): Promise<Response> {
+    const authError = authorizeRequest(request);
+
+    if (authError) {
+      return authError;
+    }
+
     for (const route of routes) {
       const response = await route.handle(request);
 

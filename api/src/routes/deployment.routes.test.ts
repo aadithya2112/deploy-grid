@@ -57,4 +57,30 @@ describe("DeploymentRoutes", () => {
     expect(response?.status).toBe(200);
     expect(await response?.json()).toEqual({ id: "deploy-123", type: "logs" });
   });
+
+  test("dispatches POST /deployments/:id/redeploy to the controller", async () => {
+    const create = async () => Response.json({});
+    const getById = async () => Response.json({});
+    const getLogs = async () => Response.json({});
+    const redeploy = async (_request: Request, id: string) =>
+      Response.json({ id, type: "redeploy" }, { status: 202 });
+    const routes = new DeploymentRoutes({
+      create,
+      getById,
+      getLogs,
+      redeploy,
+    } as never);
+
+    const response = await routes.handle(
+      new Request("http://localhost/deployments/deploy-123/redeploy", {
+        method: "POST",
+      }),
+    );
+
+    expect(response?.status).toBe(202);
+    expect(await response?.json()).toEqual({
+      id: "deploy-123",
+      type: "redeploy",
+    });
+  });
 });

@@ -1,6 +1,9 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Deployment } from "../domain/deployment.ts";
-import type { DeploymentSnapshot } from "../domain/deployment.types.ts";
+import type {
+  DeploymentSnapshot,
+  DeploymentStatus,
+} from "../domain/deployment.types.ts";
 import { deployments, projects } from "../db/schema.ts";
 import { db } from "../infrastructure/database.ts";
 
@@ -92,8 +95,23 @@ export class DeploymentRepository {
 
   async listByProjectId(
     projectId: string,
-    options: { limit: number; offset: number },
+    options: {
+      limit: number;
+      offset: number;
+      status?: DeploymentStatus;
+      gitRef?: string;
+    },
   ): Promise<Deployment[]> {
+    const conditions = [eq(deployments.projectId, projectId)];
+
+    if (options.status) {
+      conditions.push(eq(deployments.status, options.status));
+    }
+
+    if (options.gitRef) {
+      conditions.push(eq(deployments.gitRef, options.gitRef));
+    }
+
     const rows = await db
       .select({
         deployment: deployments,
@@ -101,7 +119,7 @@ export class DeploymentRepository {
       })
       .from(deployments)
       .innerJoin(projects, eq(deployments.projectId, projects.id))
-      .where(eq(deployments.projectId, projectId))
+      .where(and(...conditions))
       .orderBy(desc(deployments.createdAt), asc(deployments.id))
       .limit(options.limit)
       .offset(options.offset);

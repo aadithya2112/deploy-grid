@@ -3,3 +3,4 @@ process.env.DATABASE_URL ??=
 process.env.UPSTASH_REDIS_REST_URL ??= "https://example.upstash.io";
 process.env.UPSTASH_REDIS_REST_TOKEN ??= "test-token";
 process.env.DEPLOYMENT_QUEUE_NAME ??= "deployment_jobs_test";
+process.env.PROJECT_ENV_ENCRYPTION_KEY ??= "test-project-env-encryption-key";

@@ -76,10 +76,12 @@ The worker runtime is expected to live in a separate repository and VM. This rep
 
 - Added `GET /health` with a database-backed health check
 - Added `GET /deployments/:id/logs`
+- Added `POST /deployments/:id/redeploy`
 - Added project-centric endpoints:
   - `POST /projects`
   - `GET /projects`
   - `GET /projects/:id`
+  - `PATCH /projects/:id`
   - `POST /projects/:id/deployments`
   - `GET /projects/:id/deployments`
 - Kept the transitional `POST /deployments` endpoint
@@ -118,6 +120,20 @@ The worker runtime is expected to live in a separate repository and VM. This rep
   - `bun run typecheck`
   - `bun run test`
 
+### API hardening and control-plane polish
+
+- Added optional Bearer-token auth through `API_AUTH_TOKEN`
+- Added shared request parsing and validation helpers
+- Added encrypted project env var storage through `PROJECT_ENV_ENCRYPTION_KEY`
+- Added masked env var reads after decryption
+- Added pagination metadata and basic filtering for list endpoints
+- Added tests for:
+  - auth helper behavior
+  - project update flow
+  - redeploy flow
+  - encrypted env var handling
+  - filtered/paginated project and deployment listing
+
 ## In progress
 
 ### External worker integration
@@ -135,9 +151,9 @@ The worker runtime is expected to live in a separate repository and VM. This rep
 
 ### API hardening and follow-up polish
 
-- project and deployment list endpoints currently use offset-based pagination only
-- env vars are masked on read, but secret encryption/rotation policy is still pending
-- auth and request validation can be tightened further
+- project and deployment list endpoints still use offset-based pagination rather than cursor pagination
+- env vars are encrypted and masked, but rotation conventions are still pending
+- auth currently uses a single shared API token and can be expanded to real user/project access control
 - health checks can be expanded to include queue-level visibility if needed
 
 ## Not done yet
@@ -156,14 +172,13 @@ The worker runtime is expected to live in a separate repository and VM. This rep
 
 ### Remaining API enhancements
 
-- project update endpoints for editing build settings after creation
-- redeploy support
-- stronger pagination and filtering for list endpoints
+- richer filtering and cursor-style pagination for list endpoints
 - optional internal endpoints if the worker should update state through HTTP instead of SQL
+- richer deployment detail shaping if the UI needs more status context
+- project update history or audit metadata if config changes need traceability
 
 ### Secrets and metadata hardening
 
-- encrypt project env var values at rest
 - define env var rotation/update conventions
 - artifact URL persistence from the external worker
 - richer preview metadata once the worker starts publishing artifacts
@@ -179,15 +194,15 @@ The worker runtime is expected to live in a separate repository and VM. This rep
 - worker retry strategy
 - dead-letter handling or failed job recovery
 - queue-aware health and readiness checks
-- request-level validation cleanup
-- auth and access control
+- auth and access control beyond a shared API token
+- request-level validation cleanup for any future endpoints
 
 ## Recommended next steps
 
 1. Implement the external worker repo against the current queue payload and Postgres contract.
-2. Add project update and redeploy endpoints in the API.
-3. Encrypt project env var values and define secret-management rules.
-4. Add auth and stricter request validation to the expanded API surface.
+2. Define env var rotation/update conventions and worker-side secret consumption rules.
+3. Add richer pagination/filtering and deployment detail shaping for the dashboard.
+4. Replace or extend the shared API token with stronger access control if multi-user access is needed.
 
 ## Notes
 

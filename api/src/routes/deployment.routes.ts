@@ -10,6 +10,17 @@ export class DeploymentRoutes {
       return this.controller.create(request);
     }
 
+    const deploymentRedeployRoute = /^\/deployments\/([^/]+)\/redeploy$/.exec(
+      url.pathname,
+    );
+
+    if (request.method === "POST" && deploymentRedeployRoute) {
+      const [, id] = deploymentRedeployRoute;
+      if (id) {
+        return this.controller.redeploy(request, id);
+      }
+    }
+
     const deploymentLogsRoute = /^\/deployments\/([^/]+)\/logs$/.exec(url.pathname);
 
     if (request.method === "GET" && deploymentLogsRoute) {

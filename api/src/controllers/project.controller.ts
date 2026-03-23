@@ -1,4 +1,13 @@
 import { ProjectNotFoundError, InvalidProjectRequestError, type ProjectService } from "../services/project.service.ts";
+import {
+  RequestValidationError,
+  optionalEnum,
+  optionalNullableString,
+  optionalString,
+  parseJsonBody,
+  parsePagination,
+  requireString,
+} from "../http/validation.ts";
 
 interface CreateProjectBody {
   repoUrl?: string;
@@ -14,6 +23,15 @@ interface CreateProjectDeploymentBody {
   gitRef?: string;
 }
 
+interface UpdateProjectBody {
+  name?: string;
+  defaultBranch?: string;
+  rootDirectory?: string | null;
+  installCommand?: string | null;
+  buildCommand?: string | null;
+  outputDirectory?: string | null;
+}
+
 interface UpsertEnvVarBody {
   value?: string;
   target?: "all" | "preview" | "production";
@@ -24,51 +42,16 @@ export class ProjectController {
 
   async create(request: Request): Promise<Response> {
     try {
-      const body = (await request.json()) as CreateProjectBody;
-
-      if (typeof body.repoUrl !== "string") {
-        return Response.json(
-          { error: "repoUrl must be a string" },
-          { status: 400 },
-        );
-      }
-
-      if (body.name !== undefined && typeof body.name !== "string") {
-        return Response.json({ error: "name must be a string" }, { status: 400 });
-      }
-
-      if (
-        body.defaultBranch !== undefined &&
-        typeof body.defaultBranch !== "string"
-      ) {
-        return Response.json(
-          { error: "defaultBranch must be a string" },
-          { status: 400 },
-        );
-      }
-
-      for (const [field, value] of Object.entries({
-        rootDirectory: body.rootDirectory,
-        installCommand: body.installCommand,
-        buildCommand: body.buildCommand,
-        outputDirectory: body.outputDirectory,
-      })) {
-        if (value !== undefined && value !== null && typeof value !== "string") {
-          return Response.json(
-            { error: `${field} must be a string or null` },
-            { status: 400 },
-          );
-        }
-      }
+      const body = await parseJsonBody<CreateProjectBody>(request);
 
       const project = await this.projectService.createProject({
-        repoUrl: body.repoUrl,
-        name: body.name,
-        defaultBranch: body.defaultBranch,
-        rootDirectory: body.rootDirectory,
-        installCommand: body.installCommand,
-        buildCommand: body.buildCommand,
-        outputDirectory: body.outputDirectory,
+        repoUrl: requireString(body.repoUrl, "repoUrl"),
+        name: optionalString(body.name, "name"),
+        defaultBranch: optionalString(body.defaultBranch, "defaultBranch"),
+        rootDirectory: optionalNullableString(body.rootDirectory, "rootDirectory"),
+        installCommand: optionalNullableString(body.installCommand, "installCommand"),
+        buildCommand: optionalNullableString(body.buildCommand, "buildCommand"),
+        outputDirectory: optionalNullableString(body.outputDirectory, "outputDirectory"),
       });
       return Response.json(project, { status: 201 });
     } catch (error: unknown) {
@@ -79,25 +62,24 @@ export class ProjectController {
   async list(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const limit = Number(url.searchParams.get("limit") ?? "50");
-      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const { limit, offset } = parsePagination(url.searchParams);
+      const query = url.searchParams.get("query")?.trim() || undefined;
+      const projects = await this.projectService.listProjects({
+        limit: limit + 1,
+        offset,
+        query,
+      });
+      const visibleProjects = projects.slice(0, limit);
 
-      if (!Number.isFinite(limit) || limit <= 0) {
-        return Response.json(
-          { error: "limit must be a positive number" },
-          { status: 400 },
-        );
-      }
-
-      if (!Number.isFinite(offset) || offset < 0) {
-        return Response.json(
-          { error: "offset must be a non-negative number" },
-          { status: 400 },
-        );
-      }
-
-      const projects = await this.projectService.listProjects({ limit, offset });
-      return Response.json({ projects });
+      return Response.json({
+        projects: visibleProjects,
+        pageInfo: {
+          limit,
+          offset,
+          hasMore: projects.length > limit,
+          nextOffset: projects.length > limit ? offset + limit : null,
+        },
+      });
     } catch (error: unknown) {
       return this.handleError(error);
     }
@@ -114,21 +96,13 @@ export class ProjectController {
 
   async createDeployment(request: Request, projectId: string): Promise<Response> {
     try {
-      const rawBody = await request.text();
-      const body = rawBody
-        ? (JSON.parse(rawBody) as CreateProjectDeploymentBody)
-        : {};
-
-      if (body.gitRef !== undefined && typeof body.gitRef !== "string") {
-        return Response.json(
-          { error: "gitRef must be a string" },
-          { status: 400 },
-        );
-      }
+      const body = await parseJsonBody<CreateProjectDeploymentBody>(request, {
+        allowEmpty: true,
+      });
 
       const deployment = await this.projectService.createDeployment(
         projectId,
-        body.gitRef,
+        optionalString(body.gitRef, "gitRef"),
       );
 
       return Response.json(deployment.toJSON(), { status: 202 });
@@ -140,32 +114,50 @@ export class ProjectController {
   async listDeployments(request: Request, projectId: string): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const limit = Number(url.searchParams.get("limit") ?? "50");
-      const offset = Number(url.searchParams.get("offset") ?? "0");
-
-      if (!Number.isFinite(limit) || limit <= 0) {
-        return Response.json(
-          { error: "limit must be a positive number" },
-          { status: 400 },
-        );
-      }
-
-      if (!Number.isFinite(offset) || offset < 0) {
-        return Response.json(
-          { error: "offset must be a non-negative number" },
-          { status: 400 },
-        );
-      }
+      const { limit, offset } = parsePagination(url.searchParams);
+      const status = optionalEnum(
+        url.searchParams.get("status") ?? undefined,
+        "status",
+        ["queued", "building", "ready", "failed", "cancelled"] as const,
+      );
+      const gitRef = url.searchParams.get("gitRef")?.trim() || undefined;
 
       const deployments = await this.projectService.listDeployments(projectId, {
-        limit,
+        limit: limit + 1,
         offset,
+        status,
+        gitRef,
       });
+      const visibleDeployments = deployments.slice(0, limit);
 
       return Response.json({
         projectId,
-        deployments: deployments.map((deployment) => deployment.toJSON()),
+        deployments: visibleDeployments.map((deployment) => deployment.toJSON()),
+        pageInfo: {
+          limit,
+          offset,
+          hasMore: deployments.length > limit,
+          nextOffset: deployments.length > limit ? offset + limit : null,
+        },
       });
+    } catch (error: unknown) {
+      return this.handleError(error);
+    }
+  }
+
+  async update(request: Request, projectId: string): Promise<Response> {
+    try {
+      const body = await parseJsonBody<UpdateProjectBody>(request);
+      const project = await this.projectService.updateProject(projectId, {
+        name: optionalString(body.name, "name"),
+        defaultBranch: optionalString(body.defaultBranch, "defaultBranch"),
+        rootDirectory: optionalNullableString(body.rootDirectory, "rootDirectory"),
+        installCommand: optionalNullableString(body.installCommand, "installCommand"),
+        buildCommand: optionalNullableString(body.buildCommand, "buildCommand"),
+        outputDirectory: optionalNullableString(body.outputDirectory, "outputDirectory"),
+      });
+
+      return Response.json(project);
     } catch (error: unknown) {
       return this.handleError(error);
     }
@@ -186,29 +178,16 @@ export class ProjectController {
     key: string,
   ): Promise<Response> {
     try {
-      const body = (await request.json()) as UpsertEnvVarBody;
-
-      if (typeof body.value !== "string") {
-        return Response.json(
-          { error: "value must be a string" },
-          { status: 400 },
-        );
-      }
-
-      if (
-        body.target !== undefined &&
-        !["all", "preview", "production"].includes(body.target)
-      ) {
-        return Response.json(
-          { error: "target must be one of: all, preview, production" },
-          { status: 400 },
-        );
-      }
+      const body = await parseJsonBody<UpsertEnvVarBody>(request);
 
       const envVar = await this.projectService.upsertEnvVar(projectId, {
         key,
-        value: body.value,
-        target: body.target,
+        value: requireString(body.value, "value"),
+        target: optionalEnum(body.target, "target", [
+          "all",
+          "preview",
+          "production",
+        ] as const),
       });
 
       return Response.json(envVar, { status: 201 });
@@ -224,17 +203,12 @@ export class ProjectController {
   ): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const target = (url.searchParams.get("target") ?? "all") as
-        | "all"
-        | "preview"
-        | "production";
-
-      if (!["all", "preview", "production"].includes(target)) {
-        return Response.json(
-          { error: "target must be one of: all, preview, production" },
-          { status: 400 },
-        );
-      }
+      const target =
+        optionalEnum(url.searchParams.get("target") ?? undefined, "target", [
+          "all",
+          "preview",
+          "production",
+        ] as const) ?? "all";
 
       await this.projectService.deleteEnvVar(projectId, key, target);
       return new Response(null, { status: 204 });
@@ -244,15 +218,14 @@ export class ProjectController {
   }
 
   private handleError(error: unknown): Response {
-    if (error instanceof SyntaxError) {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
     if (error instanceof ProjectNotFoundError) {
       return Response.json({ error: error.message }, { status: 404 });
     }
 
-    if (error instanceof InvalidProjectRequestError) {
+    if (
+      error instanceof InvalidProjectRequestError ||
+      error instanceof RequestValidationError
+    ) {
       return Response.json({ error: error.message }, { status: 400 });
     }
 

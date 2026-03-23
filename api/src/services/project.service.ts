@@ -1,4 +1,6 @@
 import type { NewProject, ProjectEnvVar } from "../db/schema.ts";
+import { decryptProjectEnvValue, encryptProjectEnvValue } from "../infrastructure/project-env-crypto.ts";
+import type { DeploymentStatus } from "../domain/deployment.types.ts";
 import { ProjectEnvVarRepository } from "../repositories/project-env-var.repository.ts";
 import { ProjectRepository } from "../repositories/project.repository.ts";
 import { deriveProjectMetadata } from "../utils/project.ts";
@@ -159,6 +161,7 @@ export class ProjectService {
   async listProjects(options: {
     limit: number;
     offset: number;
+    query?: string;
   }): Promise<ProjectSnapshot[]> {
     const projects = await this.projectRepo.list(options);
     return projects.map(toProjectSnapshot);
@@ -184,7 +187,12 @@ export class ProjectService {
 
   async listDeployments(
     projectId: string,
-    options: { limit: number; offset: number },
+    options: {
+      limit: number;
+      offset: number;
+      status?: DeploymentStatus;
+      gitRef?: string;
+    },
   ) {
     await this.requireProject(projectId);
     return this.deploymentService.listDeploymentsByProject(projectId, options);
@@ -194,15 +202,21 @@ export class ProjectService {
     await this.requireProject(projectId);
     const envVars = await this.envVarRepo.listByProjectId(projectId);
 
-    return envVars.map((envVar) => ({
-      id: envVar.id,
-      projectId: envVar.projectId,
-      key: envVar.key,
-      target: envVar.target,
-      maskedValue: maskSecret(envVar.value),
-      createdAt: envVar.createdAt.toISOString(),
-      updatedAt: envVar.updatedAt.toISOString(),
-    }));
+    return Promise.all(
+      envVars.map(async (envVar) => {
+        const decryptedValue = await decryptProjectEnvValue(envVar.value);
+
+        return {
+          id: envVar.id,
+          projectId: envVar.projectId,
+          key: envVar.key,
+          target: envVar.target,
+          maskedValue: maskSecret(decryptedValue),
+          createdAt: envVar.createdAt.toISOString(),
+          updatedAt: envVar.updatedAt.toISOString(),
+        };
+      }),
+    );
   }
 
   async upsertEnvVar(
@@ -222,19 +236,23 @@ export class ProjectService {
       throw new InvalidProjectRequestError("key is required");
     }
 
+    const encryptedValue = await encryptProjectEnvValue(value);
+
     const envVar = await this.envVarRepo.upsert({
       projectId,
       key,
-      value,
+      value: encryptedValue,
       target: input.target ?? "all",
     });
+
+    const decryptedValue = await decryptProjectEnvValue(envVar.value);
 
     return {
       id: envVar.id,
       projectId: envVar.projectId,
       key: envVar.key,
       target: envVar.target,
-      maskedValue: maskSecret(envVar.value),
+      maskedValue: maskSecret(decryptedValue),
       createdAt: envVar.createdAt.toISOString(),
       updatedAt: envVar.updatedAt.toISOString(),
     };
@@ -252,6 +270,35 @@ export class ProjectService {
     }
 
     await this.envVarRepo.delete(projectId, key.trim(), target);
+  }
+
+  async updateProject(
+    id: string,
+    input: {
+      name?: string;
+      defaultBranch?: string;
+      rootDirectory?: string | null;
+      installCommand?: string | null;
+      buildCommand?: string | null;
+      outputDirectory?: string | null;
+    },
+  ): Promise<ProjectSnapshot> {
+    await this.requireProject(id);
+
+    const project = await this.projectRepo.updateSettings(id, {
+      name: input.name?.trim(),
+      defaultBranch: input.defaultBranch?.trim(),
+      rootDirectory: input.rootDirectory?.trim() ?? input.rootDirectory,
+      installCommand: input.installCommand?.trim() ?? input.installCommand,
+      buildCommand: input.buildCommand?.trim() ?? input.buildCommand,
+      outputDirectory: input.outputDirectory?.trim() ?? input.outputDirectory,
+    });
+
+    if (!project) {
+      throw new ProjectNotFoundError(id);
+    }
+
+    return toProjectSnapshot(project);
   }
 
   private async requireProject(id: string) {

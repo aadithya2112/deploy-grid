@@ -9,6 +9,7 @@ describe("ProjectRoutes", () => {
       create,
       list,
       getById: async () => Response.json({}),
+      update: async () => Response.json({}),
       createDeployment: async () => Response.json({}),
       listDeployments: async () => Response.json({}),
       listEnvVars: async () => Response.json({}),
@@ -34,6 +35,8 @@ describe("ProjectRoutes", () => {
       create: async () => Response.json({}),
       list: async () => Response.json({}),
       getById: async (id: string) => Response.json({ id }),
+      update: async (_request: Request, id: string) =>
+        Response.json({ id, type: "update" }),
       createDeployment: async (_request: Request, id: string) =>
         Response.json({ id, type: "createDeployment" }, { status: 202 }),
       listDeployments: async (_request: Request, id: string) =>
@@ -54,6 +57,11 @@ describe("ProjectRoutes", () => {
         method: "POST",
       }),
     );
+    const updateResponse = await routes.handle(
+      new Request("http://localhost/projects/project-123", {
+        method: "PATCH",
+      }),
+    );
     const listEnvVarsResponse = await routes.handle(
       new Request("http://localhost/projects/project-123/env-vars", {
         method: "GET",
@@ -69,6 +77,10 @@ describe("ProjectRoutes", () => {
     expect(await createDeploymentResponse?.json()).toEqual({
       id: "project-123",
       type: "createDeployment",
+    });
+    expect(await updateResponse?.json()).toEqual({
+      id: "project-123",
+      type: "update",
     });
     expect(await listEnvVarsResponse?.json()).toEqual({
       id: "project-123",
