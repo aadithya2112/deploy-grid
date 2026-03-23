@@ -1,0 +1,25 @@
+{
+  "name": "worker",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "start": "bun run index.ts",
+    "smoke": "bun run ./scripts/smoke.ts",
+    "test": "bun test --preload ./test/setup.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1014.0",
+    "@upstash/redis": "^1.37.0",
+    "drizzle-orm": "^0.45.1",
+    "postgres": "^3.4.8"
+  }
+}
