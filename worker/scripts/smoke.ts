@@ -48,6 +48,11 @@ interface DeploymentLogEntry {
   message: string;
 }
 
+interface DeploymentLogsResponse {
+  deploymentId: string;
+  logs: DeploymentLogEntry[];
+}
+
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
 
@@ -57,6 +62,20 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+function normalizeLogsResponse(
+  value: DeploymentLogEntry[] | DeploymentLogsResponse,
+): DeploymentLogEntry[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value && Array.isArray(value.logs)) {
+    return value.logs;
+  }
+
+  throw new Error("Unexpected deployment logs response shape");
 }
 
 const apiBaseUrl = requireEnv("API_BASE_URL").replace(/\/+$/, "");
@@ -102,10 +121,11 @@ while (Date.now() - startTime < timeoutMs) {
     `${apiBaseUrl}/deployments/${deployment.id}`,
     { headers },
   );
-  const logs = await requestJson<DeploymentLogEntry[]>(
+  const logsResponse = await requestJson<DeploymentLogEntry[] | DeploymentLogsResponse>(
     `${apiBaseUrl}/deployments/${deployment.id}/logs?afterSequence=${afterSequence}&limit=100`,
     { headers },
   );
+  const logs = normalizeLogsResponse(logsResponse);
 
   for (const entry of logs) {
     afterSequence = Math.max(afterSequence, entry.sequence);

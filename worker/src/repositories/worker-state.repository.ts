@@ -2,13 +2,17 @@ import { sql as sqlFragment } from "drizzle-orm";
 import { db } from "../infrastructure/database.ts";
 import { buildJobs, deployments } from "../db/schema.ts";
 
+function toTimestamp(value: Date): string {
+  return value.toISOString();
+}
+
 export class WorkerStateRepository {
   async markBuilding(deploymentId: string, now: Date): Promise<void> {
     await db
       .update(deployments)
       .set({
         status: "building",
-        buildStartedAt: sqlFragment`coalesce(${deployments.buildStartedAt}, ${now})`,
+        buildStartedAt: sqlFragment`coalesce(${deployments.buildStartedAt}, ${toTimestamp(now)})`,
         errorMessage: null,
         updatedAt: now,
       })
