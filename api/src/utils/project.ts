@@ -27,7 +27,8 @@ export function deriveProjectMetadata(repoUrl: string): {
   try {
     const pathname = new URL(repoUrl).pathname;
     const parts = pathname.split("/").filter(Boolean);
-    repoName = parts.at(-1)?.replace(/\.git$/, "") || repoName;
+    repoName = decodeURIComponent(parts.at(-1) ?? "").replace(/\.git$/, "");
+    repoName = repoName || "react-app";
   } catch {
     repoName = repoUrl.split("/").filter(Boolean).at(-1) ?? repoName;
     repoName = repoName.replace(/\.git$/, "");

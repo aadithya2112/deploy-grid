@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { Deployment } from "../domain/deployment.ts";
 import type { DeploymentSnapshot } from "../domain/deployment.types.ts";
 import { deployments, projects } from "../db/schema.ts";
@@ -88,5 +88,45 @@ export class DeploymentRepository {
         errorMessage: deployment.errorMessage,
       })
       .where(eq(deployments.id, deployment.id));
+  }
+
+  async listByProjectId(
+    projectId: string,
+    options: { limit: number; offset: number },
+  ): Promise<Deployment[]> {
+    const rows = await db
+      .select({
+        deployment: deployments,
+        repoUrl: projects.repoUrl,
+      })
+      .from(deployments)
+      .innerJoin(projects, eq(deployments.projectId, projects.id))
+      .where(eq(deployments.projectId, projectId))
+      .orderBy(desc(deployments.createdAt), asc(deployments.id))
+      .limit(options.limit)
+      .offset(options.offset);
+
+    return rows.map((row) =>
+      Deployment.hydrate(toSnapshot(row.deployment, row.repoUrl)),
+    );
+  }
+
+  async findLatestByProjectId(projectId: string): Promise<Deployment | null> {
+    const [row] = await db
+      .select({
+        deployment: deployments,
+        repoUrl: projects.repoUrl,
+      })
+      .from(deployments)
+      .innerJoin(projects, eq(deployments.projectId, projects.id))
+      .where(eq(deployments.projectId, projectId))
+      .orderBy(desc(deployments.createdAt), asc(deployments.id))
+      .limit(1);
+
+    if (!row) {
+      return null;
+    }
+
+    return Deployment.hydrate(toSnapshot(row.deployment, row.repoUrl));
   }
 }

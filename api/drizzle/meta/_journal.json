@@ -15,6 +15,13 @@
       "when": 1774260209958,
       "tag": "0001_unknown_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774269829294,
+      "tag": "0002_nappy_baron_zemo",
+      "breakpoints": true
     }
   ]
 }

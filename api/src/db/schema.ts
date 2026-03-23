@@ -30,6 +30,12 @@ export const logStreamEnum = pgEnum("deployment_log_stream", [
   "system",
 ]);
 
+export const projectEnvTargetEnum = pgEnum("project_env_target", [
+  "all",
+  "preview",
+  "production",
+]);
+
 export const projects = pgTable(
   "projects",
   {
@@ -134,6 +140,33 @@ export const deploymentLogs = pgTable(
   ],
 );
 
+export const projectEnvVars = pgTable(
+  "project_env_vars",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    target: projectEnvTargetEnum("target").notNull().default("all"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("project_env_vars_project_key_target_unique").on(
+      table.projectId,
+      table.key,
+      table.target,
+    ),
+    index("project_env_vars_project_idx").on(table.projectId),
+  ],
+);
+
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type DeploymentRow = typeof deployments.$inferSelect;
@@ -142,3 +175,5 @@ export type BuildJob = typeof buildJobs.$inferSelect;
 export type NewBuildJob = typeof buildJobs.$inferInsert;
 export type DeploymentLog = typeof deploymentLogs.$inferSelect;
 export type NewDeploymentLog = typeof deploymentLogs.$inferInsert;
+export type ProjectEnvVar = typeof projectEnvVars.$inferSelect;
+export type NewProjectEnvVar = typeof projectEnvVars.$inferInsert;

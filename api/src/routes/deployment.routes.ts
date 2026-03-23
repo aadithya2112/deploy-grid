@@ -10,6 +10,15 @@ export class DeploymentRoutes {
       return this.controller.create(request);
     }
 
+    const deploymentLogsRoute = /^\/deployments\/([^/]+)\/logs$/.exec(url.pathname);
+
+    if (request.method === "GET" && deploymentLogsRoute) {
+      const [, id] = deploymentLogsRoute;
+      if (id) {
+        return this.controller.getLogs(request, id);
+      }
+    }
+
     const deploymentRoute = /^\/deployments\/([^/]+)$/.exec(url.pathname);
 
     if (request.method === "GET" && deploymentRoute) {
