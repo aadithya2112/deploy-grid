@@ -1,0 +1,15 @@
+node_modules
+.git
+.gitignore
+.DS_Store
+
+.env
+.env.*
+
+test
+coverage
+*.log
+
+README.md
+API_STATUS.md
+CLAUDE.md
