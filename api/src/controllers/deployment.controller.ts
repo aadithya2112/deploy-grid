@@ -13,6 +13,7 @@ import {
   parsePagination,
   requireString,
 } from "../http/validation.ts";
+import { getPublicErrorMessage } from "../http/error-response.ts";
 
 interface CreateDeploymentBody {
   repoUrl?: string;
@@ -55,8 +56,7 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 401 });
       }
 
-      const message =
-        error instanceof Error ? error.message : "Internal server error";
+      const message = getPublicErrorMessage(error);
 
       return Response.json({ error: message }, { status: 500 });
     }
@@ -81,7 +81,7 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 401 });
       }
 
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = getPublicErrorMessage(error, "Unknown error");
       return Response.json({ error: message }, { status: 500 });
     }
   }
@@ -128,7 +128,7 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 401 });
       }
 
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = getPublicErrorMessage(error, "Unknown error");
       return Response.json({ error: message }, { status: 500 });
     }
   }
@@ -159,7 +159,7 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 401 });
       }
 
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = getPublicErrorMessage(error, "Unknown error");
       return Response.json({ error: message }, { status: 500 });
     }
   }

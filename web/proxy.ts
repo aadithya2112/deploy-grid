@@ -1,12 +1,18 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/projects(.*)"])
+const isE2ETestMode = process.env.E2E_TEST_MODE === "1"
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect()
-  }
-})
+const appProxy = isE2ETestMode
+  ? () => NextResponse.next()
+  : clerkMiddleware(async (auth, req) => {
+      if (isProtectedRoute(req)) {
+        await auth.protect()
+      }
+    })
+
+export default appProxy
 
 export const config = {
   matcher: [

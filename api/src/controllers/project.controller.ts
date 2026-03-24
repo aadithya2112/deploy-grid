@@ -1,5 +1,6 @@
 import { ProjectNotFoundError, InvalidProjectRequestError, type ProjectService } from "../services/project.service.ts";
 import { RequestContextError, requireRequestContext } from "../http/request-context.ts";
+import { getPublicErrorMessage } from "../http/error-response.ts";
 import {
   RequestValidationError,
   optionalEnum,
@@ -249,7 +250,7 @@ export class ProjectController {
       );
     }
 
-    const message = error instanceof Error ? error.message : "Internal server error";
+    const message = getPublicErrorMessage(error);
     return Response.json({ error: message }, { status: 500 });
   }
 }

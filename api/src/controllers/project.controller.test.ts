@@ -146,6 +146,33 @@ describe("ProjectController", () => {
     });
   });
 
+  test("returns a helpful message when the project ownership migration is missing", async () => {
+    const service = {
+      listProjects: async () => {
+        throw {
+          code: "42703",
+          message:
+            'Failed query: select "projects"."clerk_user_id" from "projects" because column "clerk_user_id" does not exist',
+        };
+      },
+    };
+    const controller = new ProjectController(service as never);
+
+    const response = await controller.list(
+      new Request("http://localhost/projects", {
+        headers: {
+          "x-clerk-user-id": "user_123",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error:
+        "Database schema is out of date. Run the latest API migration with `bun run db:migrate`.",
+    });
+  });
+
   test("returns 404 when a project is not found", async () => {
     const service = {
       getProject: async () => {

@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { isE2ETestMode } from "@/lib/test-mode"
 import { cn } from "@/lib/utils"
 
 const outfitHeading = Outfit({ subsets: ["latin"], variable: "--font-heading" })
@@ -19,6 +20,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const content = <ThemeProvider>{children}</ThemeProvider>
+
   return (
     <html
       lang="en"
@@ -32,9 +35,7 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ClerkProvider>
-          <ThemeProvider>{children}</ThemeProvider>
-        </ClerkProvider>
+        {isE2ETestMode() ? content : <ClerkProvider>{content}</ClerkProvider>}
       </body>
     </html>
   )
