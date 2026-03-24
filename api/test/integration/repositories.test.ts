@@ -29,6 +29,10 @@ function createSlug(prefix: string): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
+function createClerkUserId(prefix: string): string {
+  return `user_${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+}
+
 async function cleanupProjectsByRepoUrl(repoUrls: string[]): Promise<void> {
   if (repoUrls.length === 0) {
     return;
@@ -74,11 +78,13 @@ describe("repository integration tests", () => {
   });
 
   test(
-    "ProjectRepository creates or reuses projects by repoUrl",
+    "ProjectRepository creates or reuses projects by repoUrl for the same user",
     async () => {
     const repoUrl = createRepoUrl("project");
+    const clerkUserId = createClerkUserId("project");
       try {
         const first = await projectRepository.createOrGet({
+          clerkUserId,
           slug: createSlug("react-app-project"),
           name: "react-app",
           repoUrl,
@@ -90,6 +96,7 @@ describe("repository integration tests", () => {
         });
 
         const second = await projectRepository.createOrGet({
+          clerkUserId,
           slug: createSlug("ignored-slug"),
           name: "ignored-name",
           repoUrl,
@@ -100,11 +107,62 @@ describe("repository integration tests", () => {
           outputDirectory: null,
         });
 
-        const loaded = await projectRepository.findByRepoUrl(repoUrl);
+        const loaded = await projectRepository.findByRepoUrl(repoUrl, clerkUserId);
 
         expect(second.id).toBe(first.id);
         expect(loaded?.id).toBe(first.id);
         expect(loaded?.repoUrl).toBe(repoUrl);
+        expect(loaded?.clerkUserId).toBe(clerkUserId);
+      } finally {
+        await cleanupProjectsByRepoUrl([repoUrl]);
+      }
+    },
+    { timeout: 30000 },
+  );
+
+  test(
+    "ProjectRepository allows the same repo URL for different users",
+    async () => {
+      const repoUrl = createRepoUrl("shared-project");
+      const firstUserId = createClerkUserId("first");
+      const secondUserId = createClerkUserId("second");
+
+      try {
+        const first = await projectRepository.create({
+          clerkUserId: firstUserId,
+          slug: createSlug("shared-project"),
+          name: "shared-project",
+          repoUrl,
+          defaultBranch: "main",
+          rootDirectory: null,
+          installCommand: null,
+          buildCommand: null,
+          outputDirectory: null,
+        });
+        const second = await projectRepository.create({
+          clerkUserId: secondUserId,
+          slug: createSlug("shared-project"),
+          name: "shared-project",
+          repoUrl,
+          defaultBranch: "main",
+          rootDirectory: null,
+          installCommand: null,
+          buildCommand: null,
+          outputDirectory: null,
+        });
+
+        const firstLoaded = await projectRepository.findByRepoUrl(repoUrl, firstUserId);
+        const secondLoaded = await projectRepository.findByRepoUrl(repoUrl, secondUserId);
+
+        expect(first.id).not.toBe(second.id);
+        expect(firstLoaded).toMatchObject({
+          id: first.id,
+          clerkUserId: firstUserId,
+        });
+        expect(secondLoaded).toMatchObject({
+          id: second.id,
+          clerkUserId: secondUserId,
+        });
       } finally {
         await cleanupProjectsByRepoUrl([repoUrl]);
       }
@@ -116,8 +174,10 @@ describe("repository integration tests", () => {
     "DeploymentRepository creates, updates, and loads deployments with repoUrl",
     async () => {
     const repoUrl = createRepoUrl("deployment");
+    const clerkUserId = createClerkUserId("deployment");
       try {
         const project = await projectRepository.createOrGet({
+          clerkUserId,
           slug: createSlug("react-app-deployment"),
           name: "react-app",
           repoUrl,
@@ -169,8 +229,10 @@ describe("repository integration tests", () => {
     "BuildJobRepository creates jobs and marks them as failed",
     async () => {
     const repoUrl = createRepoUrl("build-job");
+    const clerkUserId = createClerkUserId("build-job");
       try {
         const project = await projectRepository.createOrGet({
+          clerkUserId,
           slug: createSlug("react-app-build-job"),
           name: "react-app",
           repoUrl,
@@ -231,9 +293,11 @@ describe("repository integration tests", () => {
     "ProjectRepository lists, finds, and updates project settings",
     async () => {
       const repoUrl = createRepoUrl("project-settings");
+      const clerkUserId = createClerkUserId("settings");
 
       try {
         const project = await projectRepository.create({
+          clerkUserId,
           slug: createSlug("react-app-settings"),
           name: "react-app",
           repoUrl,
@@ -245,17 +309,25 @@ describe("repository integration tests", () => {
         });
 
         const listedProjects = await projectRepository.list({
+          clerkUserId,
           limit: 50,
           offset: 0,
         });
-        const loaded = await projectRepository.findById(project.id);
-        const updated = await projectRepository.updateSettings(project.id, {
+        const loaded = await projectRepository.findById(project.id, clerkUserId);
+        const updated = await projectRepository.updateSettings(
+          project.id,
+          clerkUserId,
+          {
           defaultBranch: "develop",
           buildCommand: "bun run build",
-        });
+          },
+        );
 
         expect(listedProjects.some((entry) => entry.id === project.id)).toBe(true);
         expect(loaded?.id).toBe(project.id);
+        expect(listedProjects.every((entry) => entry.clerkUserId === clerkUserId)).toBe(
+          true,
+        );
         expect(updated?.defaultBranch).toBe("develop");
         expect(updated?.buildCommand).toBe("bun run build");
       } finally {
@@ -269,9 +341,11 @@ describe("repository integration tests", () => {
     "DeploymentRepository lists deployments by project",
     async () => {
       const repoUrl = createRepoUrl("deployment-list");
+      const clerkUserId = createClerkUserId("deployment-list");
 
       try {
         const project = await projectRepository.create({
+          clerkUserId,
           slug: createSlug("react-app-list"),
           name: "react-app",
           repoUrl,
@@ -316,9 +390,11 @@ describe("repository integration tests", () => {
     "DeploymentLogRepository appends and lists logs by deployment",
     async () => {
       const repoUrl = createRepoUrl("deployment-logs");
+      const clerkUserId = createClerkUserId("deployment-logs");
 
       try {
         const project = await projectRepository.create({
+          clerkUserId,
           slug: createSlug("react-app-logs"),
           name: "react-app",
           repoUrl,
@@ -370,9 +446,11 @@ describe("repository integration tests", () => {
     "ProjectEnvVarRepository upserts, lists, and deletes env vars",
     async () => {
       const repoUrl = createRepoUrl("env-vars");
+      const clerkUserId = createClerkUserId("env-vars");
 
       try {
         const project = await projectRepository.create({
+          clerkUserId,
           slug: createSlug("react-app-env"),
           name: "react-app",
           repoUrl,

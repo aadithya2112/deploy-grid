@@ -40,6 +40,7 @@ export class DeploymentService {
   ) {}
 
   async createDeployment(
+    clerkUserId: string,
     repoUrl: string,
     gitRef?: string,
   ): Promise<Deployment> {
@@ -50,8 +51,9 @@ export class DeploymentService {
     }
 
     const project =
-      (await this.projectRepo.findByRepoUrl(normalizedRepoUrl)) ??
+      (await this.projectRepo.findByRepoUrl(normalizedRepoUrl, clerkUserId)) ??
       (await this.projectRepo.createOrGet({
+        clerkUserId,
         ...deriveProjectMetadata(normalizedRepoUrl),
         repoUrl: normalizedRepoUrl,
         defaultBranch: "main",
@@ -66,9 +68,10 @@ export class DeploymentService {
 
   async createDeploymentForProject(
     projectId: string,
+    clerkUserId: string,
     gitRef?: string,
   ): Promise<Deployment> {
-    const project = await this.projectRepo.findById(projectId);
+    const project = await this.projectRepo.findById(projectId, clerkUserId);
 
     if (!project) {
       throw new DeploymentProjectNotFoundError(projectId);
@@ -125,8 +128,8 @@ export class DeploymentService {
     return deployment;
   }
 
-  async getDeployment(id: string): Promise<Deployment> {
-    return this.requireDeployment(id);
+  async getDeployment(id: string, clerkUserId: string): Promise<Deployment> {
+    return this.requireDeployment(id, clerkUserId);
   }
 
   async listDeploymentsByProject(
@@ -143,19 +146,31 @@ export class DeploymentService {
 
   async getDeploymentLogs(
     id: string,
+    clerkUserId: string,
     options: { limit: number; afterSequence?: number },
   ) {
-    await this.requireDeployment(id);
+    await this.requireDeployment(id, clerkUserId);
     return this.deploymentLogRepo.listByDeploymentId(id, options);
   }
 
-  async redeployDeployment(id: string, gitRef?: string): Promise<Deployment> {
-    const deployment = await this.requireDeployment(id);
-    return this.createDeploymentForProject(deployment.projectId, gitRef ?? deployment.gitRef);
+  async redeployDeployment(
+    id: string,
+    clerkUserId: string,
+    gitRef?: string,
+  ): Promise<Deployment> {
+    const deployment = await this.requireDeployment(id, clerkUserId);
+    return this.createDeploymentForProject(
+      deployment.projectId,
+      clerkUserId,
+      gitRef ?? deployment.gitRef,
+    );
   }
 
-  private async requireDeployment(id: string): Promise<Deployment> {
-    const deployment = await this.repo.findById(id);
+  private async requireDeployment(
+    id: string,
+    clerkUserId: string,
+  ): Promise<Deployment> {
+    const deployment = await this.repo.findById(id, clerkUserId);
 
     if (!deployment) {
       throw new DeploymentNotFoundError(id);

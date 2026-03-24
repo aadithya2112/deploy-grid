@@ -4,6 +4,7 @@ import {
   DeploymentProjectNotFoundError,
   type DeploymentService,
 } from "../services/deployment.service.ts";
+import { RequestContextError, requireRequestContext } from "../http/request-context.ts";
 import {
   RequestValidationError,
   optionalNonNegativeIntParam,
@@ -27,9 +28,11 @@ export class DeploymentController {
 
   async create(request: Request): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const body = await parseJsonBody<CreateDeploymentBody>(request);
 
       const deployment = await this.deploymentService.createDeployment(
+        clerkUserId,
         requireString(body.repoUrl, "repoUrl"),
         optionalString(body.gitRef, "gitRef"),
       );
@@ -48,6 +51,10 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 400 });
       }
 
+      if (error instanceof RequestContextError) {
+        return Response.json({ error: error.message }, { status: 401 });
+      }
+
       const message =
         error instanceof Error ? error.message : "Internal server error";
 
@@ -55,9 +62,10 @@ export class DeploymentController {
     }
   }
 
-  async getById(id: string): Promise<Response> {
+  async getById(request: Request, id: string): Promise<Response> {
     try {
-      const deployment = await this.deploymentService.getDeployment(id);
+      const { clerkUserId } = requireRequestContext(request);
+      const deployment = await this.deploymentService.getDeployment(id, clerkUserId);
 
       return Response.json(deployment.toJSON());
     } catch (error: unknown) {
@@ -69,6 +77,10 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 400 });
       }
 
+      if (error instanceof RequestContextError) {
+        return Response.json({ error: error.message }, { status: 401 });
+      }
+
       const message = error instanceof Error ? error.message : "Unknown error";
       return Response.json({ error: message }, { status: 500 });
     }
@@ -76,6 +88,7 @@ export class DeploymentController {
 
   async getLogs(request: Request, id: string): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const url = new URL(request.url);
       const { limit } = parsePagination(url.searchParams, {
         defaultLimit: 100,
@@ -86,7 +99,7 @@ export class DeploymentController {
         "afterSequence",
       );
 
-      const logs = await this.deploymentService.getDeploymentLogs(id, {
+      const logs = await this.deploymentService.getDeploymentLogs(id, clerkUserId, {
         limit,
         afterSequence,
       });
@@ -111,6 +124,10 @@ export class DeploymentController {
         return Response.json({ error: error.message }, { status: 400 });
       }
 
+      if (error instanceof RequestContextError) {
+        return Response.json({ error: error.message }, { status: 401 });
+      }
+
       const message = error instanceof Error ? error.message : "Unknown error";
       return Response.json({ error: message }, { status: 500 });
     }
@@ -118,11 +135,13 @@ export class DeploymentController {
 
   async redeploy(request: Request, id: string): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const body = await parseJsonBody<RedeployDeploymentBody>(request, {
         allowEmpty: true,
       });
       const deployment = await this.deploymentService.redeployDeployment(
         id,
+        clerkUserId,
         optionalString(body.gitRef, "gitRef"),
       );
 
@@ -134,6 +153,10 @@ export class DeploymentController {
 
       if (error instanceof RequestValidationError) {
         return Response.json({ error: error.message }, { status: 400 });
+      }
+
+      if (error instanceof RequestContextError) {
+        return Response.json({ error: error.message }, { status: 401 });
       }
 
       const message = error instanceof Error ? error.message : "Unknown error";

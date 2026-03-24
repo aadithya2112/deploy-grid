@@ -5,6 +5,7 @@ import { DeploymentService } from "./deployment.service.ts";
 function createProject(overrides: Partial<Project> = {}): Project {
   return {
     id: "project-123",
+    clerkUserId: "user_123",
     slug: "react-app-123abc",
     name: "react-app",
     repoUrl: "https://github.com/acme/react-app.git",
@@ -29,7 +30,7 @@ describe("DeploymentService", () => {
       {} as never,
     );
 
-    await expect(service.createDeployment("   ")).rejects.toThrow(
+    await expect(service.createDeployment("user_123", "   ")).rejects.toThrow(
       "repoUrl is required",
     );
   });
@@ -46,7 +47,12 @@ describe("DeploymentService", () => {
       async (_values: { slug: string; name: string; repoUrl: string }) =>
         project,
     );
-    const findByRepoUrl = mock(async (_repoUrl: string) => project);
+    const findByRepoUrl = mock(
+      async (_repoUrl: string, clerkUserId?: string) => {
+        expect(clerkUserId).toBe("user_123");
+        return project;
+      },
+    );
     const createDeployment = mock(async (_deployment: unknown) => {});
     const createBuildJob = mock(async (_deploymentId: string) => ({
       id: "job-123",
@@ -70,9 +76,9 @@ describe("DeploymentService", () => {
       { enqueue } as never,
     );
 
-    const deployment = await service.createDeployment(project.repoUrl);
+    const deployment = await service.createDeployment("user_123", project.repoUrl);
 
-    expect(findByRepoUrl).toHaveBeenCalledWith(project.repoUrl);
+    expect(findByRepoUrl).toHaveBeenCalledWith(project.repoUrl, "user_123");
     expect(createOrGet).not.toHaveBeenCalled();
     expect(createDeployment).toHaveBeenCalledTimes(1);
     expect(createBuildJob).toHaveBeenCalledWith(deployment.id);
@@ -97,7 +103,12 @@ describe("DeploymentService", () => {
       async (_values: { slug: string; name: string; repoUrl: string }) =>
         project,
     );
-    const findByRepoUrl = mock(async (_repoUrl: string) => null);
+    const findByRepoUrl = mock(
+      async (_repoUrl: string, clerkUserId?: string) => {
+        expect(clerkUserId).toBe("user_123");
+        return null;
+      },
+    );
     const createDeployment = mock(async (_deployment: unknown) => {});
     const createBuildJob = mock(async (_deploymentId: string) => ({
       id: "job-123",
@@ -121,11 +132,12 @@ describe("DeploymentService", () => {
       { enqueue } as never,
     );
 
-    await service.createDeployment(project.repoUrl);
+    await service.createDeployment("user_123", project.repoUrl);
 
-    expect(findByRepoUrl).toHaveBeenCalledWith(project.repoUrl);
+    expect(findByRepoUrl).toHaveBeenCalledWith(project.repoUrl, "user_123");
     expect(createOrGet).toHaveBeenCalledTimes(1);
     expect(createOrGet.mock.calls[0]?.[0]).toMatchObject({
+      clerkUserId: "user_123",
       name: "react-app",
       repoUrl: project.repoUrl,
     });
@@ -154,7 +166,11 @@ describe("DeploymentService", () => {
       { enqueue } as never,
     );
 
-    const deployment = await service.createDeployment(project.repoUrl, " release ");
+    const deployment = await service.createDeployment(
+      "user_123",
+      project.repoUrl,
+      " release ",
+    );
 
     expect(deployment.gitRef).toBe("release");
     expect(enqueue).toHaveBeenCalledWith(
@@ -191,7 +207,7 @@ describe("DeploymentService", () => {
       } as never,
     );
 
-    const deployment = await service.createDeployment(project.repoUrl);
+    const deployment = await service.createDeployment("user_123", project.repoUrl);
 
     expect(createDeployment).toHaveBeenCalledTimes(1);
     expect(updateDeployment).toHaveBeenCalledTimes(1);
@@ -218,7 +234,7 @@ describe("DeploymentService", () => {
       } as never,
       {} as never,
       { enqueue: async () => {} } as never,
-    ).createDeployment(project.repoUrl);
+    ).createDeployment("user_123", project.repoUrl);
 
     const service = new DeploymentService(
       {
@@ -233,7 +249,7 @@ describe("DeploymentService", () => {
       {} as never,
     );
 
-    await expect(service.getDeployment(createdDeployment.id)).resolves.toBe(
+    await expect(service.getDeployment(createdDeployment.id, "user_123")).resolves.toBe(
       createdDeployment,
     );
   });
@@ -251,8 +267,29 @@ describe("DeploymentService", () => {
       {} as never,
     );
 
-    await expect(service.getDeployment("missing-id")).rejects.toThrow(
+    await expect(service.getDeployment("missing-id", "user_123")).rejects.toThrow(
       "Deployment missing-id not found",
+    );
+  });
+
+  test("treats deployments from another user as not found", async () => {
+    const service = new DeploymentService(
+      {
+        create: async () => {},
+        findById: async (_id: string, clerkUserId?: string) => {
+          expect(clerkUserId).toBe("user_456");
+          return null;
+        },
+        update: async () => {},
+      } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.getDeployment("deployment-123", "user_456")).rejects.toThrow(
+      "Deployment deployment-123 not found",
     );
   });
 });

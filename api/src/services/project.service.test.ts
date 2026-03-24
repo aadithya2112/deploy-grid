@@ -10,6 +10,7 @@ import {
 function createProject(overrides: Partial<Project> = {}): Project {
   return {
     id: "project-123",
+    clerkUserId: "user_123",
     slug: "react-app-123abc",
     name: "react-app",
     repoUrl: "https://github.com/acme/react-app.git",
@@ -25,6 +26,38 @@ function createProject(overrides: Partial<Project> = {}): Project {
 }
 
 describe("ProjectService", () => {
+  test("creates projects within the current user scope", async () => {
+    const create = async (values: {
+      clerkUserId?: string | null;
+      repoUrl: string;
+      name: string;
+    }) =>
+      createProject({
+        clerkUserId: values.clerkUserId ?? null,
+        repoUrl: values.repoUrl,
+        name: values.name,
+      });
+    const service = new ProjectService(
+      {
+        findByRepoUrl: async (repoUrl: string, clerkUserId?: string) => {
+          expect(repoUrl).toBe("https://github.com/acme/react-app.git");
+          expect(clerkUserId).toBe("user_123");
+          return null;
+        },
+        create,
+      } as never,
+      {} as never,
+      {} as never,
+    );
+
+    const project = await service.createProject("user_123", {
+      repoUrl: "https://github.com/acme/react-app.git",
+    });
+
+    expect(project.repoUrl).toBe("https://github.com/acme/react-app.git");
+    expect(project.name).toBe("react-app");
+  });
+
   test("updates project settings", async () => {
     const updatedProject = createProject({
       defaultBranch: "develop",
@@ -39,7 +72,7 @@ describe("ProjectService", () => {
       {} as never,
     );
 
-    const project = await service.updateProject("project-123", {
+    const project = await service.updateProject("user_123", "project-123", {
       defaultBranch: "develop",
       buildCommand: "bun run build",
     });
@@ -57,7 +90,7 @@ describe("ProjectService", () => {
       {} as never,
     );
 
-    await expect(service.updateProject("missing", {})).rejects.toThrow(
+    await expect(service.updateProject("user_123", "missing", {})).rejects.toThrow(
       "Project missing not found",
     );
   });
@@ -101,12 +134,12 @@ describe("ProjectService", () => {
       {} as never,
     );
 
-    const created = await service.upsertEnvVar("project-123", {
+    const created = await service.upsertEnvVar("user_123", "project-123", {
       key: "API_KEY",
       value: "secret-value-1234",
       target: "preview",
     });
-    const listed = await service.listEnvVars("project-123");
+    const listed = await service.listEnvVars("user_123", "project-123");
 
     expect(storedValues).toHaveLength(1);
     expect(isEncryptedProjectEnvValue(storedValues[0]!)).toBe(true);
@@ -125,7 +158,7 @@ describe("ProjectService", () => {
     );
 
     await expect(
-      service.upsertEnvVar("project-123", {
+      service.upsertEnvVar("user_123", "project-123", {
         key: "   ",
         value: "secret",
       }),
@@ -135,7 +168,10 @@ describe("ProjectService", () => {
   test("passes filters and pagination to deployment listings", async () => {
     const service = new ProjectService(
       {
-        findById: async () => createProject(),
+        findById: async (_id: string, clerkUserId?: string) => {
+          expect(clerkUserId).toBe("user_123");
+          return createProject();
+        },
       } as never,
       {} as never,
       {
@@ -160,7 +196,7 @@ describe("ProjectService", () => {
       } as never,
     );
 
-    const deployments = await service.listDeployments("project-123", {
+    const deployments = await service.listDeployments("user_123", "project-123", {
       limit: 10,
       offset: 5,
       status: "ready",
@@ -171,22 +207,34 @@ describe("ProjectService", () => {
   });
 
   test("creates deployments through the deployment service", async () => {
+    let capturedClerkUserId: string | null = null
     const service = new ProjectService(
       {
-        findById: async () => createProject(),
+        findById: async (_id: string, clerkUserId?: string) => {
+          expect(clerkUserId).toBe("user_123");
+          return createProject();
+        },
       } as never,
       {} as never,
       {
-        createDeploymentForProject: async (projectId: string, gitRef?: string) => ({
-          projectId,
-          gitRef,
-        }),
+        createDeploymentForProject: async (
+          projectId: string,
+          clerkUserId: string,
+          gitRef?: string,
+        ) => {
+          capturedClerkUserId = clerkUserId
+          return {
+            projectId,
+            gitRef,
+          }
+        },
       } as never,
     );
 
-    const result = await service.createDeployment("project-123", "develop");
+    const result = await service.createDeployment("user_123", "project-123", "develop");
 
     expect(result.projectId).toBe("project-123");
+    expect(capturedClerkUserId === "user_123").toBe(true);
     expect(result.gitRef).toBe("develop");
   });
 
@@ -199,7 +247,7 @@ describe("ProjectService", () => {
       {} as never,
     );
 
-    await expect(service.getProject("missing")).rejects.toThrow(
+    await expect(service.getProject("user_123", "missing")).rejects.toThrow(
       new ProjectNotFoundError("missing"),
     );
   });

@@ -54,7 +54,13 @@ export class DeploymentRepository {
     });
   }
 
-  async findById(id: string): Promise<Deployment | null> {
+  async findById(id: string, clerkUserId?: string): Promise<Deployment | null> {
+    const conditions = [eq(deployments.id, id)];
+
+    if (clerkUserId !== undefined) {
+      conditions.push(eq(projects.clerkUserId, clerkUserId));
+    }
+
     const [row] = await db
       .select({
         deployment: deployments,
@@ -62,7 +68,7 @@ export class DeploymentRepository {
       })
       .from(deployments)
       .innerJoin(projects, eq(deployments.projectId, projects.id))
-      .where(eq(deployments.id, id))
+      .where(and(...conditions))
       .limit(1);
 
     if (!row) {

@@ -279,6 +279,7 @@ describe("JobProcessor", () => {
   test("skips duplicate delivery for terminal jobs", async () => {
     const project: Project = {
       id: "project-1",
+      clerkUserId: "user_terminal",
       slug: "demo",
       name: "Demo",
       repoUrl: "https://example.com/demo.git",
@@ -332,6 +333,7 @@ describe("JobProcessor", () => {
 
     const project: Project = {
       id: "project-2",
+      clerkUserId: "user_success",
       slug: "demo-success",
       name: "Demo Success",
       repoUrl: repo.repoDir,
@@ -411,6 +413,7 @@ describe("JobProcessor", () => {
 
     const project: Project = {
       id: "project-3",
+      clerkUserId: "user_failure",
       slug: "demo-failure",
       name: "Demo Failure",
       repoUrl: repo.repoDir,
@@ -476,6 +479,7 @@ describe("JobProcessor", () => {
 
     const project: Project = {
       id: "project-4",
+      clerkUserId: "user_upload_failure",
       slug: "demo-upload-failure",
       name: "Demo Upload Failure",
       repoUrl: repo.repoDir,
@@ -549,6 +553,7 @@ describe("JobProcessor", () => {
 
     const project: Project = {
       id: "project-5",
+      clerkUserId: "user_retry",
       slug: "demo-retry",
       name: "Demo Retry",
       repoUrl: repo.repoDir,

@@ -47,7 +47,7 @@ export class ProjectRoutes {
     if (request.method === "GET" && projectEnvVarsRoute) {
       const [, projectId] = projectEnvVarsRoute;
       if (projectId) {
-        return this.controller.listEnvVars(projectId);
+        return this.controller.listEnvVars(request, projectId);
       }
     }
 
@@ -74,7 +74,7 @@ export class ProjectRoutes {
       const [, id] = projectRoute;
       if (id) {
         if (request.method === "GET") {
-          return this.controller.getById(id);
+          return this.controller.getById(request, id);
         }
 
         if (request.method === "PATCH") {

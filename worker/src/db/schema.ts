@@ -40,6 +40,7 @@ export const projects = pgTable(
   "projects",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    clerkUserId: text("clerk_user_id"),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     repoUrl: text("repo_url").notNull(),
@@ -56,8 +57,15 @@ export const projects = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("projects_slug_unique").on(table.slug),
-    uniqueIndex("projects_repo_url_unique").on(table.repoUrl),
+    index("projects_clerk_user_id_idx").on(table.clerkUserId),
+    uniqueIndex("projects_clerk_user_slug_unique").on(
+      table.clerkUserId,
+      table.slug,
+    ),
+    uniqueIndex("projects_clerk_user_repo_url_unique").on(
+      table.clerkUserId,
+      table.repoUrl,
+    ),
   ],
 );
 

@@ -18,7 +18,8 @@ describe("DeploymentRoutes", () => {
 
   test("dispatches GET /deployments/:id to the controller", async () => {
     const create = async () => Response.json({});
-    const getById = async (id: string) => Response.json({ id }, { status: 200 });
+    const getById = async (_request: Request, id: string) =>
+      Response.json({ id }, { status: 200 });
     const routes = new DeploymentRoutes({ create, getById } as never);
 
     const response = await routes.handle(

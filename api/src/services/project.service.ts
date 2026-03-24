@@ -88,6 +88,7 @@ export class ProjectService {
   ) {}
 
   async createProject(
+    clerkUserId: string,
     input: {
       repoUrl: string;
       name?: string;
@@ -105,9 +106,13 @@ export class ProjectService {
     }
 
     const metadata = deriveProjectMetadata(normalizedRepoUrl);
-    const existingProject = await this.projectRepo.findByRepoUrl(normalizedRepoUrl);
+    const existingProject = await this.projectRepo.findByRepoUrl(
+      normalizedRepoUrl,
+      clerkUserId,
+    );
     const values: Pick<
       NewProject,
+      | "clerkUserId"
       | "slug"
       | "name"
       | "repoUrl"
@@ -117,6 +122,7 @@ export class ProjectService {
       | "buildCommand"
       | "outputDirectory"
     > = {
+      clerkUserId,
       slug: existingProject?.slug ?? metadata.slug,
       name: input.name?.trim() || metadata.name,
       repoUrl: normalizedRepoUrl,
@@ -141,7 +147,7 @@ export class ProjectService {
     };
 
     const project = existingProject
-      ? await this.projectRepo.updateSettings(existingProject.id, {
+      ? await this.projectRepo.updateSettings(existingProject.id, clerkUserId, {
           name: values.name,
           defaultBranch: values.defaultBranch,
           rootDirectory: values.rootDirectory,
@@ -159,6 +165,7 @@ export class ProjectService {
   }
 
   async listProjects(options: {
+    clerkUserId: string;
     limit: number;
     offset: number;
     query?: string;
@@ -167,8 +174,8 @@ export class ProjectService {
     return projects.map(toProjectSnapshot);
   }
 
-  async getProject(id: string): Promise<ProjectSnapshot> {
-    const project = await this.projectRepo.findById(id);
+  async getProject(clerkUserId: string, id: string): Promise<ProjectSnapshot> {
+    const project = await this.projectRepo.findById(id, clerkUserId);
 
     if (!project) {
       throw new ProjectNotFoundError(id);
@@ -178,14 +185,20 @@ export class ProjectService {
   }
 
   async createDeployment(
+    clerkUserId: string,
     projectId: string,
     gitRef?: string,
   ) {
-    await this.requireProject(projectId);
-    return this.deploymentService.createDeploymentForProject(projectId, gitRef);
+    await this.requireProject(projectId, clerkUserId);
+    return this.deploymentService.createDeploymentForProject(
+      projectId,
+      clerkUserId,
+      gitRef,
+    );
   }
 
   async listDeployments(
+    clerkUserId: string,
     projectId: string,
     options: {
       limit: number;
@@ -194,12 +207,15 @@ export class ProjectService {
       gitRef?: string;
     },
   ) {
-    await this.requireProject(projectId);
+    await this.requireProject(projectId, clerkUserId);
     return this.deploymentService.listDeploymentsByProject(projectId, options);
   }
 
-  async listEnvVars(projectId: string): Promise<ProjectEnvVarSnapshot[]> {
-    await this.requireProject(projectId);
+  async listEnvVars(
+    clerkUserId: string,
+    projectId: string,
+  ): Promise<ProjectEnvVarSnapshot[]> {
+    await this.requireProject(projectId, clerkUserId);
     const envVars = await this.envVarRepo.listByProjectId(projectId);
 
     return Promise.all(
@@ -220,6 +236,7 @@ export class ProjectService {
   }
 
   async upsertEnvVar(
+    clerkUserId: string,
     projectId: string,
     input: {
       key: string;
@@ -227,7 +244,7 @@ export class ProjectService {
       target?: ProjectEnvVar["target"];
     },
   ): Promise<ProjectEnvVarSnapshot> {
-    await this.requireProject(projectId);
+    await this.requireProject(projectId, clerkUserId);
 
     const key = input.key.trim();
     const value = input.value;
@@ -259,11 +276,12 @@ export class ProjectService {
   }
 
   async deleteEnvVar(
+    clerkUserId: string,
     projectId: string,
     key: string,
     target: ProjectEnvVar["target"],
   ): Promise<void> {
-    await this.requireProject(projectId);
+    await this.requireProject(projectId, clerkUserId);
 
     if (!key.trim()) {
       throw new InvalidProjectRequestError("key is required");
@@ -273,6 +291,7 @@ export class ProjectService {
   }
 
   async updateProject(
+    clerkUserId: string,
     id: string,
     input: {
       name?: string;
@@ -283,9 +302,9 @@ export class ProjectService {
       outputDirectory?: string | null;
     },
   ): Promise<ProjectSnapshot> {
-    await this.requireProject(id);
+    await this.requireProject(id, clerkUserId);
 
-    const project = await this.projectRepo.updateSettings(id, {
+    const project = await this.projectRepo.updateSettings(id, clerkUserId, {
       name: input.name?.trim(),
       defaultBranch: input.defaultBranch?.trim(),
       rootDirectory: input.rootDirectory?.trim() ?? input.rootDirectory,
@@ -301,8 +320,8 @@ export class ProjectService {
     return toProjectSnapshot(project);
   }
 
-  private async requireProject(id: string) {
-    const project = await this.projectRepo.findById(id);
+  private async requireProject(id: string, clerkUserId: string) {
+    const project = await this.projectRepo.findById(id, clerkUserId);
 
     if (!project) {
       throw new ProjectNotFoundError(id);

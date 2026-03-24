@@ -80,6 +80,7 @@ function normalizeLogsResponse(
 
 const apiBaseUrl = requireEnv("API_BASE_URL").replace(/\/+$/, "");
 const apiAuthToken = optionalEnv("API_AUTH_TOKEN");
+const smokeClerkUserId = optionalEnv("SMOKE_CLERK_USER_ID") ?? "smoke-user";
 const projectId = optionalEnv("SMOKE_PROJECT_ID");
 const repoUrl = optionalEnv("SMOKE_REPO_URL");
 const gitRef = optionalEnv("SMOKE_GIT_REF");
@@ -97,6 +98,8 @@ const headers: Record<string, string> = {
 if (apiAuthToken) {
   headers.authorization = `Bearer ${apiAuthToken}`;
 }
+
+headers["x-clerk-user-id"] = smokeClerkUserId;
 
 const createUrl = projectId
   ? `${apiBaseUrl}/projects/${projectId}/deployments`

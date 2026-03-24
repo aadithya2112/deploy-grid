@@ -1,4 +1,5 @@
 import { ProjectNotFoundError, InvalidProjectRequestError, type ProjectService } from "../services/project.service.ts";
+import { RequestContextError, requireRequestContext } from "../http/request-context.ts";
 import {
   RequestValidationError,
   optionalEnum,
@@ -42,9 +43,10 @@ export class ProjectController {
 
   async create(request: Request): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const body = await parseJsonBody<CreateProjectBody>(request);
 
-      const project = await this.projectService.createProject({
+      const project = await this.projectService.createProject(clerkUserId, {
         repoUrl: requireString(body.repoUrl, "repoUrl"),
         name: optionalString(body.name, "name"),
         defaultBranch: optionalString(body.defaultBranch, "defaultBranch"),
@@ -61,10 +63,12 @@ export class ProjectController {
 
   async list(request: Request): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const url = new URL(request.url);
       const { limit, offset } = parsePagination(url.searchParams);
       const query = url.searchParams.get("query")?.trim() || undefined;
       const projects = await this.projectService.listProjects({
+        clerkUserId,
         limit: limit + 1,
         offset,
         query,
@@ -85,9 +89,10 @@ export class ProjectController {
     }
   }
 
-  async getById(id: string): Promise<Response> {
+  async getById(request: Request, id: string): Promise<Response> {
     try {
-      const project = await this.projectService.getProject(id);
+      const { clerkUserId } = requireRequestContext(request);
+      const project = await this.projectService.getProject(clerkUserId, id);
       return Response.json(project);
     } catch (error: unknown) {
       return this.handleError(error);
@@ -96,11 +101,13 @@ export class ProjectController {
 
   async createDeployment(request: Request, projectId: string): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const body = await parseJsonBody<CreateProjectDeploymentBody>(request, {
         allowEmpty: true,
       });
 
       const deployment = await this.projectService.createDeployment(
+        clerkUserId,
         projectId,
         optionalString(body.gitRef, "gitRef"),
       );
@@ -113,6 +120,7 @@ export class ProjectController {
 
   async listDeployments(request: Request, projectId: string): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const url = new URL(request.url);
       const { limit, offset } = parsePagination(url.searchParams);
       const status = optionalEnum(
@@ -122,12 +130,16 @@ export class ProjectController {
       );
       const gitRef = url.searchParams.get("gitRef")?.trim() || undefined;
 
-      const deployments = await this.projectService.listDeployments(projectId, {
-        limit: limit + 1,
-        offset,
-        status,
-        gitRef,
-      });
+      const deployments = await this.projectService.listDeployments(
+        clerkUserId,
+        projectId,
+        {
+          limit: limit + 1,
+          offset,
+          status,
+          gitRef,
+        },
+      );
       const visibleDeployments = deployments.slice(0, limit);
 
       return Response.json({
@@ -147,8 +159,9 @@ export class ProjectController {
 
   async update(request: Request, projectId: string): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const body = await parseJsonBody<UpdateProjectBody>(request);
-      const project = await this.projectService.updateProject(projectId, {
+      const project = await this.projectService.updateProject(clerkUserId, projectId, {
         name: optionalString(body.name, "name"),
         defaultBranch: optionalString(body.defaultBranch, "defaultBranch"),
         rootDirectory: optionalNullableString(body.rootDirectory, "rootDirectory"),
@@ -163,9 +176,10 @@ export class ProjectController {
     }
   }
 
-  async listEnvVars(projectId: string): Promise<Response> {
+  async listEnvVars(request: Request, projectId: string): Promise<Response> {
     try {
-      const envVars = await this.projectService.listEnvVars(projectId);
+      const { clerkUserId } = requireRequestContext(request);
+      const envVars = await this.projectService.listEnvVars(clerkUserId, projectId);
       return Response.json({ projectId, envVars });
     } catch (error: unknown) {
       return this.handleError(error);
@@ -178,9 +192,10 @@ export class ProjectController {
     key: string,
   ): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const body = await parseJsonBody<UpsertEnvVarBody>(request);
 
-      const envVar = await this.projectService.upsertEnvVar(projectId, {
+      const envVar = await this.projectService.upsertEnvVar(clerkUserId, projectId, {
         key,
         value: requireString(body.value, "value"),
         target: optionalEnum(body.target, "target", [
@@ -202,6 +217,7 @@ export class ProjectController {
     key: string,
   ): Promise<Response> {
     try {
+      const { clerkUserId } = requireRequestContext(request);
       const url = new URL(request.url);
       const target =
         optionalEnum(url.searchParams.get("target") ?? undefined, "target", [
@@ -210,7 +226,7 @@ export class ProjectController {
           "production",
         ] as const) ?? "all";
 
-      await this.projectService.deleteEnvVar(projectId, key, target);
+      await this.projectService.deleteEnvVar(clerkUserId, projectId, key, target);
       return new Response(null, { status: 204 });
     } catch (error: unknown) {
       return this.handleError(error);
@@ -223,10 +239,14 @@ export class ProjectController {
     }
 
     if (
+      error instanceof RequestContextError ||
       error instanceof InvalidProjectRequestError ||
       error instanceof RequestValidationError
     ) {
-      return Response.json({ error: error.message }, { status: 400 });
+      return Response.json(
+        { error: error.message },
+        { status: error instanceof RequestContextError ? 401 : 400 },
+      );
     }
 
     const message = error instanceof Error ? error.message : "Internal server error";

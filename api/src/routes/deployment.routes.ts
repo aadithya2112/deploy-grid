@@ -35,7 +35,7 @@ export class DeploymentRoutes {
     if (request.method === "GET" && deploymentRoute) {
       const [, id] = deploymentRoute;
       if (id) {
-        return this.controller.getById(id);
+        return this.controller.getById(request, id);
       }
     }
 

@@ -9,7 +9,10 @@ export function authorizeRequest(
   request: Request,
   options: AuthorizeRequestOptions = {},
 ): Response | null {
-  const expectedToken = options.expectedToken ?? env.apiAuthToken;
+  const expectedToken =
+    options.expectedToken === undefined
+      ? env.apiAuthToken
+      : options.expectedToken;
   const publicPaths = options.publicPaths ?? ["/health"];
   const path = new URL(request.url).pathname;
 

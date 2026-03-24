@@ -22,6 +22,7 @@ describe("DeploymentController", () => {
       body: JSON.stringify({}),
       headers: {
         "content-type": "application/json",
+        "x-clerk-user-id": "user_123",
       },
     });
 
@@ -51,6 +52,7 @@ describe("DeploymentController", () => {
       }),
       headers: {
         "content-type": "application/json",
+        "x-clerk-user-id": "user_123",
       },
     });
 
@@ -77,6 +79,7 @@ describe("DeploymentController", () => {
       body: "{bad json",
       headers: {
         "content-type": "application/json",
+        "x-clerk-user-id": "user_123",
       },
     });
 
@@ -105,6 +108,7 @@ describe("DeploymentController", () => {
       }),
       headers: {
         "content-type": "application/json",
+        "x-clerk-user-id": "user_123",
       },
     });
 
@@ -123,7 +127,12 @@ describe("DeploymentController", () => {
       gitRef: "main",
     });
     const service = {
-      createDeployment: async (repoUrl: string, gitRef?: string) => {
+      createDeployment: async (
+        clerkUserId: string,
+        repoUrl: string,
+        gitRef?: string,
+      ) => {
+        expect(clerkUserId).toBe("user_123");
         expect(repoUrl).toBe("https://github.com/acme/react-app.git");
         expect(gitRef).toBe("main");
         return deployment;
@@ -141,6 +150,7 @@ describe("DeploymentController", () => {
       }),
       headers: {
         "content-type": "application/json",
+        "x-clerk-user-id": "user_123",
       },
     });
 
@@ -167,6 +177,7 @@ describe("DeploymentController", () => {
       }),
       headers: {
         "content-type": "application/json",
+        "x-clerk-user-id": "user_123",
       },
     });
 
@@ -189,7 +200,14 @@ describe("DeploymentController", () => {
     };
     const controller = new DeploymentController(service as never);
 
-    const response = await controller.getById("missing-id");
+    const response = await controller.getById(
+      new Request("http://localhost/deployments/missing-id", {
+        headers: {
+          "x-clerk-user-id": "user_123",
+        },
+      }),
+      "missing-id",
+    );
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
@@ -208,7 +226,14 @@ describe("DeploymentController", () => {
     };
     const controller = new DeploymentController(service as never);
 
-    const response = await controller.getById("deployment-123");
+    const response = await controller.getById(
+      new Request("http://localhost/deployments/deployment-123", {
+        headers: {
+          "x-clerk-user-id": "user_123",
+        },
+      }),
+      "deployment-123",
+    );
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
@@ -224,7 +249,12 @@ describe("DeploymentController", () => {
       getDeployment: async () => {
         throw new Error("should not be called");
       },
-      getDeploymentLogs: async (_id: string, options: { limit: number }) => {
+      getDeploymentLogs: async (
+        _id: string,
+        clerkUserId: string,
+        options: { limit: number },
+      ) => {
+        expect(clerkUserId).toBe("user_123");
         expect(options.limit).toBe(10);
         return [
           {
@@ -241,7 +271,11 @@ describe("DeploymentController", () => {
     const controller = new DeploymentController(service as never);
 
     const response = await controller.getLogs(
-      new Request("http://localhost/deployments/deployment-123/logs?limit=10"),
+      new Request("http://localhost/deployments/deployment-123/logs?limit=10", {
+        headers: {
+          "x-clerk-user-id": "user_123",
+        },
+      }),
       "deployment-123",
     );
 
@@ -276,7 +310,11 @@ describe("DeploymentController", () => {
     const controller = new DeploymentController(service as never);
 
     const response = await controller.getLogs(
-      new Request("http://localhost/deployments/deployment-123/logs?limit=0"),
+      new Request("http://localhost/deployments/deployment-123/logs?limit=0", {
+        headers: {
+          "x-clerk-user-id": "user_123",
+        },
+      }),
       "deployment-123",
     );
 
@@ -293,8 +331,13 @@ describe("DeploymentController", () => {
       gitRef: "release",
     });
     const service = {
-      redeployDeployment: async (id: string, gitRef?: string) => {
+      redeployDeployment: async (
+        id: string,
+        clerkUserId: string,
+        gitRef?: string,
+      ) => {
         expect(id).toBe("deployment-123");
+        expect(clerkUserId).toBe("user_123");
         expect(gitRef).toBe("release");
         return deployment;
       },
@@ -304,7 +347,10 @@ describe("DeploymentController", () => {
     const response = await controller.redeploy(
       new Request("http://localhost/deployments/deployment-123/redeploy", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-clerk-user-id": "user_123",
+        },
         body: JSON.stringify({ gitRef: "release" }),
       }),
       "deployment-123",
@@ -312,5 +358,19 @@ describe("DeploymentController", () => {
 
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual(deployment.toJSON());
+  });
+
+  test("returns 401 when the clerk user header is missing", async () => {
+    const controller = new DeploymentController({} as never);
+
+    const response = await controller.getById(
+      new Request("http://localhost/deployments/deployment-123"),
+      "deployment-123",
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: "x-clerk-user-id header is required",
+    });
   });
 });

@@ -34,14 +34,14 @@ describe("ProjectRoutes", () => {
     const routes = new ProjectRoutes({
       create: async () => Response.json({}),
       list: async () => Response.json({}),
-      getById: async (id: string) => Response.json({ id }),
+      getById: async (_request: Request, id: string) => Response.json({ id }),
       update: async (_request: Request, id: string) =>
         Response.json({ id, type: "update" }),
       createDeployment: async (_request: Request, id: string) =>
         Response.json({ id, type: "createDeployment" }, { status: 202 }),
       listDeployments: async (_request: Request, id: string) =>
         Response.json({ id, type: "listDeployments" }),
-      listEnvVars: async (id: string) =>
+      listEnvVars: async (_request: Request, id: string) =>
         Response.json({ id, type: "listEnvVars" }),
       upsertEnvVar: async (_request: Request, id: string, key: string) =>
         Response.json({ id, key, type: "upsertEnvVar" }),

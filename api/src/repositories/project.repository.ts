@@ -1,4 +1,4 @@
-import { asc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, eq, ilike, or } from "drizzle-orm";
 import type { NewProject, Project } from "../db/schema.ts";
 import { projects } from "../db/schema.ts";
 import { db } from "../infrastructure/database.ts";
@@ -7,6 +7,7 @@ export class ProjectRepository {
   async createOrGet(
     values: Pick<
       NewProject,
+      | "clerkUserId"
       | "slug"
       | "name"
       | "repoUrl"
@@ -21,8 +22,15 @@ export class ProjectRepository {
       .insert(projects)
       .values(values)
       .onConflictDoUpdate({
-        target: projects.repoUrl,
+        target: [projects.clerkUserId, projects.repoUrl],
         set: {
+          slug: values.slug,
+          name: values.name,
+          defaultBranch: values.defaultBranch,
+          rootDirectory: values.rootDirectory,
+          installCommand: values.installCommand,
+          buildCommand: values.buildCommand,
+          outputDirectory: values.outputDirectory,
           updatedAt: new Date(),
         },
       })
@@ -38,6 +46,7 @@ export class ProjectRepository {
   async create(
     values: Pick<
       NewProject,
+      | "clerkUserId"
       | "slug"
       | "name"
       | "repoUrl"
@@ -57,41 +66,59 @@ export class ProjectRepository {
     return project;
   }
 
-  async findById(id: string): Promise<Project | null> {
+  async findById(id: string, clerkUserId?: string): Promise<Project | null> {
+    const conditions = [eq(projects.id, id)];
+
+    if (clerkUserId !== undefined) {
+      conditions.push(eq(projects.clerkUserId, clerkUserId));
+    }
+
     const [project] = await db
       .select()
       .from(projects)
-      .where(eq(projects.id, id))
+      .where(and(...conditions))
       .limit(1);
 
     return project ?? null;
   }
 
-  async findByRepoUrl(repoUrl: string): Promise<Project | null> {
+  async findByRepoUrl(repoUrl: string, clerkUserId?: string): Promise<Project | null> {
+    const conditions = [eq(projects.repoUrl, repoUrl)];
+
+    if (clerkUserId !== undefined) {
+      conditions.push(eq(projects.clerkUserId, clerkUserId));
+    }
+
     const [project] = await db
       .select()
       .from(projects)
-      .where(eq(projects.repoUrl, repoUrl))
+      .where(and(...conditions))
       .limit(1);
 
     return project ?? null;
   }
 
   async list(options: {
+    clerkUserId: string;
     limit: number;
     offset: number;
     query?: string;
   }): Promise<Project[]> {
+    const conditions = [eq(projects.clerkUserId, options.clerkUserId)];
+
     if (options.query?.trim()) {
       const search = `%${options.query.trim()}%`;
       return db
         .select()
         .from(projects)
         .where(
-          or(
-            ilike(projects.name, search),
-            ilike(projects.slug, search),
-            ilike(projects.repoUrl, search),
+          and(
+            ...conditions,
+            or(
+              ilike(projects.name, search),
+              ilike(projects.slug, search),
+              ilike(projects.repoUrl, search),
+            )!,
           ),
         )
         .orderBy(asc(projects.createdAt))
@@ -102,6 +129,7 @@ export class ProjectRepository {
     return db
       .select()
       .from(projects)
+      .where(and(...conditions))
       .orderBy(asc(projects.createdAt))
       .limit(options.limit)
       .offset(options.offset);
@@ -109,6 +137,7 @@ export class ProjectRepository {
 
   async updateSettings(
     id: string,
+    clerkUserId: string,
     values: Partial<
       Pick<
         NewProject,
@@ -127,7 +156,7 @@ export class ProjectRepository {
         ...values,
         updatedAt: new Date(),
       })
-      .where(eq(projects.id, id))
+      .where(and(eq(projects.id, id), eq(projects.clerkUserId, clerkUserId)))
       .returning();
 
     return project ?? null;
