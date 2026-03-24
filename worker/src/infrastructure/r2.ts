@@ -1,15 +1,15 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { env } from "../config/env.ts";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import { env } from "../config/env.ts"
 
 export interface UploadArtifactInput {
-  key: string;
-  body: Uint8Array;
-  contentType: string;
+  key: string
+  body: Uint8Array
+  contentType: string
 }
 
 export interface ArtifactStorageLike {
-  uploadObject(input: UploadArtifactInput): Promise<void>;
-  buildArtifactUrl(deploymentId: string): string;
+  uploadObject(input: UploadArtifactInput): Promise<void>
+  buildArtifactUrl(deploymentId: string): string
 }
 
 export class ArtifactStorage implements ArtifactStorageLike {
@@ -20,9 +20,9 @@ export class ArtifactStorage implements ArtifactStorageLike {
       accessKeyId: env.artifactAccessKey,
       secretAccessKey: env.artifactSecretKey,
     },
-  });
+  })
 
-  readonly bucket = env.artifactBucket;
+  readonly bucket = env.artifactBucket
 
   async uploadObject(input: UploadArtifactInput): Promise<void> {
     await this.client.send(
@@ -32,16 +32,16 @@ export class ArtifactStorage implements ArtifactStorageLike {
         Body: input.body,
         ContentType: input.contentType,
       }),
-    );
+    )
   }
 
   buildArtifactUrl(deploymentId: string): string {
-    const baseUrl = env.artifactBaseUrl ?? env.r2PublicBaseUrl;
+    const baseUrl = env.artifactBaseUrl ?? env.r2PublicBaseUrl
 
     if (!baseUrl) {
-      throw new Error("No artifact base URL is configured");
+      throw new Error("No artifact base URL is configured")
     }
 
-    return `${baseUrl}/deployments/${deploymentId}/`;
+    return `${baseUrl}/deployments/${deploymentId}/index.html`
   }
 }

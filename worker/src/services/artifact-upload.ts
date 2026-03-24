@@ -1,15 +1,15 @@
-import path from "node:path";
-import { listDirectoryFiles } from "../build/fs.ts";
-import type { ArtifactStorageLike } from "../infrastructure/r2.ts";
+import path from "node:path"
+import { listDirectoryFiles } from "../build/fs.ts"
+import type { ArtifactStorageLike } from "../infrastructure/r2.ts"
 
 function sanitizeArtifactPath(relativePath: string): string {
-  const normalized = path.posix.normalize(relativePath.replace(/\\/g, "/"));
+  const normalized = path.posix.normalize(relativePath.replace(/\\/g, "/"))
 
   if (normalized.startsWith("../") || normalized === "..") {
-    throw new Error("Artifact path escapes output directory");
+    throw new Error("Artifact path escapes output directory")
   }
 
-  return normalized.replace(/^\/+/, "");
+  return normalized.replace(/^\/+/, "")
 }
 
 export async function uploadArtifactDirectory(
@@ -17,21 +17,30 @@ export async function uploadArtifactDirectory(
   deploymentId: string,
   directoryPath: string,
 ): Promise<string> {
-  const files = await listDirectoryFiles(directoryPath);
+  const files = await listDirectoryFiles(directoryPath)
 
   if (files.length === 0) {
-    throw new Error("Artifact directory is empty");
+    throw new Error("Artifact directory is empty")
   }
 
   for (const file of files) {
-    const key = `deployments/${deploymentId}/${sanitizeArtifactPath(file.relativePath)}`;
+    const sanitizedRelativePath = sanitizeArtifactPath(file.relativePath)
+    const key = `deployments/${deploymentId}/${sanitizedRelativePath}`
 
     await artifactStorage.uploadObject({
       key,
       body: file.contents,
       contentType: file.contentType,
-    });
+    })
+
+    if (sanitizedRelativePath.startsWith("assets/")) {
+      await artifactStorage.uploadObject({
+        key: sanitizedRelativePath,
+        body: file.contents,
+        contentType: file.contentType,
+      })
+    }
   }
 
-  return artifactStorage.buildArtifactUrl(deploymentId);
+  return artifactStorage.buildArtifactUrl(deploymentId)
 }
