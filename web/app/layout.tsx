@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Geist, Geist_Mono, Inter, Outfit } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 
@@ -14,6 +15,16 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+export const metadata: Metadata = {
+  title: {
+    default: "Deploy Grid",
+    template: "%s • Deploy Grid",
+  },
+  description:
+    "Deploy Grid is a full-stack deployment dashboard to manage projects, builds, logs, and artifact URLs.",
+  applicationName: "Deploy Grid",
+}
 
 export default function RootLayout({
   children,
