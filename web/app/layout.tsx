@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   description:
     "Deploy Grid is a full-stack deployment dashboard to manage projects, builds, logs, and artifact URLs.",
   applicationName: "Deploy Grid",
+  icons: {
+    icon: "/logo.svg",
+    apple: "/logo.svg",
+    shortcut: "/logo.svg",
+  },
 }
 
 export default function RootLayout({
