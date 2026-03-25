@@ -1,0 +1,4 @@
+- Add env support during deployment
+- Change favicon
+- Make frontend more user-friendly and intuitive
+- Make user data more secure with clerk webhooks or similar with server-side session validation
