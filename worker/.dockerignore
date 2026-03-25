@@ -1,0 +1,17 @@
+node_modules
+.git
+.gitignore
+.DS_Store
+
+.env
+.env.*
+
+test
+coverage
+*.log
+tmp
+.tmp
+
+README.md
+WORKER_REQUIREMENTS.md
+CLAUDE.md
