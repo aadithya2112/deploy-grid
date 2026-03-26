@@ -52,7 +52,7 @@ function defaultInstallCommand(packageManager: PackageManager): string {
     case "yarn":
       return "yarn install --frozen-lockfile";
     case "npm":
-      return "npm ci";
+      return "npm ci --include=dev";
   }
 }
 
