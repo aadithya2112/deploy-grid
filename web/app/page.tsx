@@ -1,18 +1,10 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
 import { ArrowRight, ChevronRight, Github, TerminalSquare } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { getAuth } from "@/lib/auth"
 
-export default async function LandingPage() {
-  const { userId } = await getAuth()
-
-  if (userId) {
-    redirect("/dashboard")
-  }
-
+export default function LandingPage() {
   return (
     <main className="min-h-svh bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.09),transparent_38%),linear-gradient(to_bottom,transparent,rgba(15,23,42,0.02))] px-4 py-4 md:px-8 md:py-6">
       <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-7xl flex-col rounded-[32px] border border-border/70 bg-background/95 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.35)]">

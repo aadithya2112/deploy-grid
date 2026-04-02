@@ -7,6 +7,14 @@ const isE2ETestMode = process.env.E2E_TEST_MODE === "1"
 const appProxy = isE2ETestMode
   ? () => NextResponse.next()
   : clerkMiddleware(async (auth, req) => {
+      if (req.nextUrl.pathname === "/") {
+        const { userId } = await auth()
+
+        if (userId) {
+          return NextResponse.redirect(new URL("/dashboard", req.url))
+        }
+      }
+
       if (isProtectedRoute(req)) {
         await auth.protect()
       }

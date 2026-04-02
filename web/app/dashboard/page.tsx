@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
-  Activity,
   ArrowRight,
   FolderGit2,
   Plus,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 
+import { ApiHealthCard } from "@/components/dashboard/api-health-card"
 import { DeploymentStatusBadge } from "@/components/deployments/status-badge"
 import { PageShell } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
@@ -39,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getAuth } from "@/lib/auth"
-import { getApiBaseUrlForUi, getHealth, listProjects } from "@/lib/api"
+import { listProjects } from "@/lib/api"
 import { isE2ETestMode } from "@/lib/test-mode"
 
 function formatDate(value: string) {
@@ -52,6 +52,11 @@ function normalizeQuery(input: string | string[] | undefined) {
   }
 
   return input.trim()
+}
+
+const emptyProjects = {
+  projects: [],
+  pageInfo: { limit: 20, offset: 0, hasMore: false, nextOffset: null },
 }
 
 export default async function DashboardPage({
@@ -68,27 +73,18 @@ export default async function DashboardPage({
   const params = searchParams ? await searchParams : undefined
   const query = normalizeQuery(params?.query)
 
-  let healthError: string | null = null
-  let projectError: string | null = null
-
-  const [health, projects] = await Promise.all([
-    getHealth().catch((error) => {
-      healthError =
-        error instanceof Error ? error.message : "Failed to load health"
-      return null
-    }),
-    listProjects(userId, {
-      limit: 20,
-      query: query || undefined,
-    }).catch((error) => {
-      projectError =
-        error instanceof Error ? error.message : "Failed to load projects"
-      return {
-        projects: [],
-        pageInfo: { limit: 20, offset: 0, hasMore: false, nextOffset: null },
-      }
-    }),
-  ])
+  const { projectError, projects } = await listProjects(userId, {
+    limit: 20,
+    query: query || undefined,
+  })
+    .then((projects) => ({
+      projectError: null,
+      projects,
+    }))
+    .catch((error) => ({
+      projectError: error instanceof Error ? error.message : "Failed to load projects",
+      projects: emptyProjects,
+    }))
 
   const sortedProjects = [...projects.projects].sort(
     (left, right) =>
@@ -270,43 +266,7 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-border/70 bg-muted/[0.35] p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                  API health
-                </p>
-                <h3 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
-                  Live status from /health.
-                </h3>
-              </div>
-              <Activity className="size-4 text-muted-foreground" />
-            </div>
-            <div className="mt-6 space-y-3">
-              {health ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={health.status === "ok" ? "default" : "destructive"}
-                      className="rounded-full px-3"
-                    >
-                      {health.status}
-                    </Badge>
-                    <Badge variant="outline" className="rounded-full px-3">
-                      Database: {health.database}
-                    </Badge>
-                  </div>
-                  <p className="rounded-2xl border border-border/70 bg-background/80 px-3 py-2 font-mono text-xs text-muted-foreground">
-                    {getApiBaseUrlForUi()}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-destructive">
-                  {healthError ?? "Unable to load health"}
-                </p>
-              )}
-            </div>
-          </div>
+          <ApiHealthCard />
 
           <Card className="rounded-[24px] border-border/70 shadow-none">
             <CardHeader>

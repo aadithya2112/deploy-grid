@@ -9,14 +9,10 @@ import { renderServerComponent } from "@/tests/support/server-component"
 
 const {
   getAuthMock,
-  getHealthMock,
   listProjectsMock,
-  getApiBaseUrlForUiMock,
 } = vi.hoisted(() => ({
   getAuthMock: vi.fn(),
-  getHealthMock: vi.fn(),
   listProjectsMock: vi.fn(),
-  getApiBaseUrlForUiMock: vi.fn(() => "http://127.0.0.1:3000"),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -31,10 +27,12 @@ vi.mock("@/lib/test-mode", () => ({
   isE2ETestMode: () => false,
 }))
 
+vi.mock("@/components/dashboard/api-health-card", () => ({
+  ApiHealthCard: () => null,
+}))
+
 vi.mock("@/lib/api", () => ({
-  getHealth: getHealthMock,
   listProjects: listProjectsMock,
-  getApiBaseUrlForUi: getApiBaseUrlForUiMock,
 }))
 
 import DashboardPage from "./page"
@@ -43,12 +41,9 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     resetNavigationMocks()
     getAuthMock.mockReset()
-    getHealthMock.mockReset()
     listProjectsMock.mockReset()
-    getApiBaseUrlForUiMock.mockClear()
 
     getAuthMock.mockResolvedValue({ userId: "user_123" })
-    getHealthMock.mockResolvedValue({ status: "ok", database: "ok" })
     listProjectsMock.mockResolvedValue({
       projects: [
         {
@@ -116,12 +111,10 @@ describe("DashboardPage", () => {
   })
 
   test("renders fallback UI when health and projects fail", async () => {
-    getHealthMock.mockRejectedValueOnce(new Error("Health offline"))
     listProjectsMock.mockRejectedValueOnce(new Error("Projects offline"))
 
     await renderServerComponent(DashboardPage({}))
 
-    expect(screen.getByText("Health offline")).toBeInTheDocument()
     expect(screen.getByText("Projects offline")).toBeInTheDocument()
   })
 })
