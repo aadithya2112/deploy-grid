@@ -45,7 +45,7 @@ async function buildWakeHeaders(wakeUrl: string): Promise<HeadersInit> {
   return headers;
 }
 
-export async function wakeDeploymentWorker(): Promise<void> {
+export async function wakeDeploymentWorkerAsync(): Promise<void> {
   const wakeUrl = env.workerWakeUrl;
 
   if (!wakeUrl) {
@@ -60,7 +60,7 @@ export async function wakeDeploymentWorker(): Promise<void> {
       const response = await fetch(wakeUrl, {
         method: "POST",
         headers: await buildWakeHeaders(wakeUrl),
-        signal: AbortSignal.timeout(120_000),
+        // Builds can run for many minutes; do not abort the worker request.
       });
 
       if (response.ok) {
@@ -91,5 +91,14 @@ export async function wakeDeploymentWorker(): Promise<void> {
   logger.error("Deployment worker wake failed after retries", {
     wakeUrl,
     error: lastError instanceof Error ? lastError.message : "Unknown wake error",
+  });
+}
+
+/** Notifies the worker without blocking the API response to clients. */
+export function wakeDeploymentWorker(): void {
+  void wakeDeploymentWorkerAsync().catch((error) => {
+    logger.error("Background worker wake failed", {
+      error: error instanceof Error ? error.message : "Unknown wake error",
+    });
   });
 }

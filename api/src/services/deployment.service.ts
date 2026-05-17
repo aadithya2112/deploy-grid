@@ -112,7 +112,7 @@ export class DeploymentService {
         outputDirectory: project.outputDirectory,
       });
 
-      await wakeDeploymentWorker();
+      wakeDeploymentWorker();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to enqueue build job";
