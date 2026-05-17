@@ -16,14 +16,14 @@ describe("wakeDeploymentWorker", () => {
         throw new Error("metadata unavailable in tests");
       }
 
-      return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+      return new Response(JSON.stringify({ status: "accepted" }), { status: 202 });
     });
     const originalFetch = globalThis.fetch;
     globalThis.fetch = fetchMock as typeof fetch;
 
     try {
-      const { wakeDeploymentWorkerAsync } = await import("./worker-wake.ts");
-      await wakeDeploymentWorkerAsync();
+      const { wakeDeploymentWorker } = await import("./worker-wake.ts");
+      await wakeDeploymentWorker();
 
       const wakeCalls = fetchMock.mock.calls.filter(([input]) => {
         const url = typeof input === "string" ? input : input.toString();
@@ -55,8 +55,8 @@ describe("wakeDeploymentWorker", () => {
     globalThis.fetch = fetchMock as typeof fetch;
 
     try {
-      const { wakeDeploymentWorkerAsync } = await import("./worker-wake.ts");
-      await wakeDeploymentWorkerAsync();
+      const { wakeDeploymentWorker } = await import("./worker-wake.ts");
+      await wakeDeploymentWorker();
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       globalThis.fetch = originalFetch;

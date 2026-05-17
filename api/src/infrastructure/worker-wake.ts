@@ -3,6 +3,7 @@ import { logger } from "./logger.ts";
 
 const WAKE_ATTEMPTS = 3;
 const WAKE_RETRY_DELAY_MS = 1_000;
+const WAKE_TIMEOUT_MS = 60_000;
 const WORKER_WAKE_TOKEN_HEADER = "X-Worker-Wake-Token";
 
 function sleep(ms: number): Promise<void> {
@@ -60,10 +61,10 @@ export async function wakeDeploymentWorkerAsync(): Promise<void> {
       const response = await fetch(wakeUrl, {
         method: "POST",
         headers: await buildWakeHeaders(wakeUrl),
-        // Builds can run for many minutes; do not abort the worker request.
+        signal: AbortSignal.timeout(WAKE_TIMEOUT_MS),
       });
 
-      if (response.ok) {
+      if (response.ok || response.status === 202) {
         logger.info("Deployment worker wake succeeded", {
           status: response.status,
           attempt,
@@ -94,11 +95,7 @@ export async function wakeDeploymentWorkerAsync(): Promise<void> {
   });
 }
 
-/** Notifies the worker without blocking the API response to clients. */
-export function wakeDeploymentWorker(): void {
-  void wakeDeploymentWorkerAsync().catch((error) => {
-    logger.error("Background worker wake failed", {
-      error: error instanceof Error ? error.message : "Unknown wake error",
-    });
-  });
+/** Wakes the worker and waits only until it accepts the job (HTTP 202). */
+export async function wakeDeploymentWorker(): Promise<void> {
+  await wakeDeploymentWorkerAsync();
 }

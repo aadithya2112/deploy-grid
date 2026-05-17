@@ -90,15 +90,13 @@ const server = Bun.serve({
         return Response.json({ error: "Unauthorized" }, { status: 401 })
       }
 
-      try {
-        const result = await scheduleProcessUntilIdle()
-        return Response.json({ status: "ok", ...result }, { status: 200 })
-      } catch (error) {
-        logger.error("Internal process request failed", {
+      void scheduleProcessUntilIdle().catch((error) => {
+        logger.error("Background queue processing failed", {
           error: error instanceof Error ? error.message : "Unknown process error",
         })
-        return Response.json({ error: "Processing failed" }, { status: 500 })
-      }
+      })
+
+      return Response.json({ status: "accepted" }, { status: 202 })
     }
 
     return Response.json({ error: "Not found" }, { status: 404 })
@@ -107,8 +105,13 @@ const server = Bun.serve({
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
-    logger.info("Received shutdown signal", { signal, workerId: env.workerId })
-    server.stop(true)
+    logger.info("Received shutdown signal, waiting for active builds", {
+      signal,
+      workerId: env.workerId,
+    })
+    void processChain.finally(() => {
+      server.stop(true)
+    })
   })
 }
 
