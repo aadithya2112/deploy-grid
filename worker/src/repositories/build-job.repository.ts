@@ -111,6 +111,45 @@ export class BuildJobRepository {
     `;
   }
 
+  async resetExpiredRunningJobs(
+    now: Date,
+    maxAttempts: number,
+  ): Promise<RecoveryJobCandidate[]> {
+    return postgresClient<RecoveryJobCandidate[]>`
+      with reset_jobs as (
+        update build_jobs bj
+        set
+          status = 'queued',
+          claimed_by = null,
+          lease_until = null,
+          updated_at = ${toTimestamp(now)}
+        from deployments d
+        where bj.deployment_id = d.id
+          and bj.status = 'running'
+          and bj.attempts < ${maxAttempts}
+          and bj.lease_until is not null
+          and bj.lease_until < ${toTimestamp(now)}
+          and d.status in ('queued', 'building')
+        returning bj.id, bj.deployment_id, bj.attempts, bj.status
+      )
+      select
+        rj.id as "buildJobId",
+        d.id as "deploymentId",
+        d.project_id as "projectId",
+        p.repo_url as "repoUrl",
+        d.git_ref as "gitRef",
+        p.root_directory as "rootDirectory",
+        p.install_command as "installCommand",
+        p.build_command as "buildCommand",
+        p.output_directory as "outputDirectory",
+        rj.attempts as "attempts",
+        rj.status as "status"
+      from reset_jobs rj
+      inner join deployments d on d.id = rj.deployment_id
+      inner join projects p on p.id = d.project_id
+    `;
+  }
+
   async listRecoveryCandidates(input: {
     staleQueuedBefore: Date;
     now: Date;
@@ -159,7 +198,7 @@ export class BuildJobRepository {
         inner join deployments d on d.id = bj.deployment_id
         inner join projects p on p.id = d.project_id
         where bj.status = 'queued'
-          and d.status = 'queued'
+          and d.status in ('queued', 'building')
           and bj.attempts < ${input.maxAttempts}
           and bj.updated_at < ${toTimestamp(input.staleQueuedBefore)}
         order by bj.updated_at asc

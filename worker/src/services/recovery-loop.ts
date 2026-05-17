@@ -1,7 +1,10 @@
 import { env } from "../config/env.ts";
 import type { DeploymentJobMessage } from "../contracts/deployment-job.ts";
 import { logger } from "../infrastructure/logger.ts";
-import { BuildJobRepository } from "../repositories/build-job.repository.ts";
+import {
+  BuildJobRepository,
+  type RecoveryJobCandidate,
+} from "../repositories/build-job.repository.ts";
 import {
   DeploymentLogWriter,
   type DeploymentLogRepositoryLike,
@@ -14,7 +17,7 @@ interface RecoveryQueue {
 interface RecoveryLoopDependencies {
   buildJobRepository: Pick<
     BuildJobRepository,
-    "listRecoveryCandidates" | "listExceededRunningJobs"
+    "resetExpiredRunningJobs" | "listRecoveryCandidates" | "listExceededRunningJobs"
   >;
   workerStateRepository: {
     failExpiredRunningJob(input: {
@@ -32,9 +35,47 @@ interface RecoveryLoopDependencies {
 export class RecoveryLoop {
   constructor(private readonly dependencies: RecoveryLoopDependencies) {}
 
+  private async enqueueCandidate(candidate: RecoveryJobCandidate): Promise<void> {
+    await this.dependencies.queue.enqueue({
+      buildJobId: candidate.buildJobId,
+      deploymentId: candidate.deploymentId,
+      projectId: candidate.projectId,
+      repoUrl: candidate.repoUrl,
+      gitRef: candidate.gitRef,
+      rootDirectory: candidate.rootDirectory,
+      installCommand: candidate.installCommand,
+      buildCommand: candidate.buildCommand,
+      outputDirectory: candidate.outputDirectory,
+    });
+  }
+
   async runOnce(): Promise<void> {
     const now = this.dependencies.now?.() ?? new Date();
     const staleQueuedBefore = new Date(now.getTime() - env.buildJobLeaseSeconds * 1_000);
+
+    const resetCandidates = await this.dependencies.buildJobRepository.resetExpiredRunningJobs(
+      now,
+      env.maxBuildAttempts,
+    );
+
+    if (resetCandidates.length > 0) {
+      logger.info("Reset expired running build jobs to queued", {
+        resetCount: resetCandidates.length,
+      });
+    }
+
+    const requeuedJobIds = new Set<string>();
+
+    for (const candidate of resetCandidates) {
+      await this.enqueueCandidate(candidate);
+      requeuedJobIds.add(candidate.buildJobId);
+
+      logger.info("Re-enqueued reset build job", {
+        buildJobId: candidate.buildJobId,
+        deploymentId: candidate.deploymentId,
+        status: candidate.status,
+      });
+    }
 
     const [recoveryCandidates, exceededRunningJobs] = await Promise.all([
       this.dependencies.buildJobRepository.listRecoveryCandidates({
@@ -50,17 +91,12 @@ export class RecoveryLoop {
     ]);
 
     for (const candidate of recoveryCandidates) {
-      await this.dependencies.queue.enqueue({
-        buildJobId: candidate.buildJobId,
-        deploymentId: candidate.deploymentId,
-        projectId: candidate.projectId,
-        repoUrl: candidate.repoUrl,
-        gitRef: candidate.gitRef,
-        rootDirectory: candidate.rootDirectory,
-        installCommand: candidate.installCommand,
-        buildCommand: candidate.buildCommand,
-        outputDirectory: candidate.outputDirectory,
-      });
+      if (requeuedJobIds.has(candidate.buildJobId)) {
+        continue;
+      }
+
+      await this.enqueueCandidate(candidate);
+      requeuedJobIds.add(candidate.buildJobId);
 
       logger.info("Re-enqueued recoverable build job", {
         buildJobId: candidate.buildJobId,

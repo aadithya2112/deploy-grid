@@ -50,6 +50,9 @@ describe("RecoveryLoop", () => {
 
     const recoveryLoop = new RecoveryLoop({
       buildJobRepository: {
+        async resetExpiredRunningJobs() {
+          return [];
+        },
         async listRecoveryCandidates() {
           return [
             {
@@ -110,5 +113,58 @@ describe("RecoveryLoop", () => {
     expect(logRepository.entries.map((entry) => entry.message)).toContain(
       "deployment marked failed: Build job exceeded the max attempts (3)",
     );
+  });
+
+  test("re-enqueues jobs reset from expired running leases", async () => {
+    const enqueuedMessages: Array<{ buildJobId: string; deploymentId: string }> = [];
+
+    const recoveryLoop = new RecoveryLoop({
+      buildJobRepository: {
+        async resetExpiredRunningJobs() {
+          return [
+            {
+              buildJobId: "job-reset",
+              deploymentId: "deployment-reset",
+              projectId: "project-1",
+              repoUrl: "https://example.com/repo.git",
+              gitRef: "main",
+              rootDirectory: null,
+              installCommand: null,
+              buildCommand: null,
+              outputDirectory: null,
+              attempts: 1,
+              status: "queued" as const,
+            },
+          ];
+        },
+        async listRecoveryCandidates() {
+          return [];
+        },
+        async listExceededRunningJobs() {
+          return [];
+        },
+      },
+      workerStateRepository: {
+        async failExpiredRunningJob() {},
+      },
+      deploymentLogRepository: new InMemoryLogRepository(),
+      queue: {
+        async enqueue(message) {
+          enqueuedMessages.push({
+            buildJobId: message.buildJobId,
+            deploymentId: message.deploymentId,
+          });
+        },
+      },
+    });
+
+    await recoveryLoop.runOnce();
+
+    expect(enqueuedMessages).toEqual([
+      {
+        buildJobId: "job-reset",
+        deploymentId: "deployment-reset",
+      },
+    ]);
   });
 });
