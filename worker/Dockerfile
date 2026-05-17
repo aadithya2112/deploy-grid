@@ -22,7 +22,10 @@ COPY index.ts ./
 COPY src ./src
 
 ENV NODE_ENV=production
+ENV PORT=8080
 ENV WORKER_TMP_DIR=/tmp/deploy-grid-worker
 RUN mkdir -p /tmp/deploy-grid-worker
+
+EXPOSE 8080
 
 CMD ["bun", "run", "start"]

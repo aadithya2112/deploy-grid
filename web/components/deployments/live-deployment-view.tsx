@@ -67,7 +67,7 @@ export function DeploymentLiveView({
   deploymentId,
   initialDeployment,
   initialLogs,
-  intervalMs = 2000,
+  intervalMs = 15_000,
 }: DeploymentLiveViewProps) {
   const [deployment, setDeployment] = useState(initialDeployment)
   const [logs, setLogs] = useState(initialLogs)

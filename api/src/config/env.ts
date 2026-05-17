@@ -21,4 +21,6 @@ export const env = {
     runtimeEnv.DEPLOYMENT_PREVIEW_BASE_URL?.replace(/\/+$/, "") ?? null,
   apiAuthToken: runtimeEnv.API_AUTH_TOKEN ?? null,
   projectEnvEncryptionKey: runtimeEnv.PROJECT_ENV_ENCRYPTION_KEY ?? null,
+  workerWakeUrl: runtimeEnv.WORKER_WAKE_URL?.replace(/\/+$/, "") ?? null,
+  workerWakeSecret: runtimeEnv.WORKER_WAKE_SECRET ?? null,
 };

@@ -61,6 +61,7 @@ export const env = {
   artifactSecretKey: requireEnv("ARTIFACT_SECRET_KEY"),
   r2S3Endpoint: requireEnv("R2_S3_ENDPOINT"),
   r2PublicBaseUrl,
+  workerWakeSecret: optionalEnv("WORKER_WAKE_SECRET"),
 };
 
 export type Env = typeof env;

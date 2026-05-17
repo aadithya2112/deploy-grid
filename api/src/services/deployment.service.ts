@@ -5,6 +5,7 @@ import { BuildJobRepository } from "../repositories/build-job.repository.ts";
 import { DeploymentLogRepository } from "../repositories/deployment-log.repository.ts";
 import type { DeploymentRepository } from "../repositories/deployment.repository.ts";
 import { ProjectRepository } from "../repositories/project.repository.ts";
+import { wakeDeploymentWorker } from "../infrastructure/worker-wake.ts";
 import { DeploymentQueue } from "../queues/deployment.queue.ts";
 import { deriveProjectMetadata } from "../utils/project.ts";
 import type { Project } from "../db/schema.ts";
@@ -110,6 +111,8 @@ export class DeploymentService {
         buildCommand: project.buildCommand,
         outputDirectory: project.outputDirectory,
       });
+
+      await wakeDeploymentWorker();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to enqueue build job";
