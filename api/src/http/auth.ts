@@ -22,14 +22,20 @@ export function authorizeRequest(
   }
 
   if (!expectedToken) {
-    return Response.json({ error: "API authentication is not configured" }, { status: 503 });
+    return Response.json(
+      { error: "API authentication is not configured" },
+      { status: 503 },
+    );
   }
 
   const authorization = request.headers.get("authorization");
 
   const expected = Buffer.from(`Bearer ${expectedToken}`);
   const supplied = Buffer.from(authorization ?? "");
-  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
+  if (
+    expected.length !== supplied.length ||
+    !timingSafeEqual(expected, supplied)
+  ) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

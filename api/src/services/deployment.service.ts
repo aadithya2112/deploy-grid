@@ -1,4 +1,7 @@
-import { PlatformRepository, type DeploymentOptions } from "../repositories/platform.repository.ts";
+import {
+  PlatformRepository,
+  type DeploymentOptions,
+} from "../repositories/platform.repository.ts";
 import { Deployment } from "../domain/deployment.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../infrastructure/logger.ts";
@@ -39,7 +42,10 @@ export class DeploymentService {
     private readonly buildJobRepo: BuildJobRepository,
     private readonly deploymentLogRepo: DeploymentLogRepository,
     private readonly deploymentQueue: DeploymentQueue,
-    private readonly platform: Pick<PlatformRepository, "createQueued"> = new PlatformRepository(),
+    private readonly platform: Pick<
+      PlatformRepository,
+      "createQueued"
+    > = new PlatformRepository(),
   ) {}
 
   async createDeployment(
@@ -102,7 +108,11 @@ export class DeploymentService {
       deployment.previewUrl = `${env.deploymentPreviewBaseUrl}/${deployment.id}`;
     }
 
-    const buildJob = await this.platform.createQueued(deployment, project, options);
+    const buildJob = await this.platform.createQueued(
+      deployment,
+      project,
+      options,
+    );
 
     try {
       await this.deploymentQueue.enqueue({

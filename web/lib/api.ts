@@ -48,7 +48,7 @@ function getApiAuthToken(): string | null {
   return process.env.DEPLOY_GRID_API_TOKEN ?? process.env.API_AUTH_TOKEN ?? null
 }
 
-async function requestApi<T>(
+export async function requestApi<T>(
   path: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
@@ -92,6 +92,7 @@ async function requestApi<T>(
     throw new ApiRequestError(message, response.status)
   }
 
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -126,9 +127,12 @@ export async function listProjects(
   }
 
   const query = params.toString()
-  return requestApi<ProjectListResponse>(`/projects${query ? `?${query}` : ""}`, {
-    clerkUserId,
-  })
+  return requestApi<ProjectListResponse>(
+    `/projects${query ? `?${query}` : ""}`,
+    {
+      clerkUserId,
+    }
+  )
 }
 
 export async function getProject(
@@ -181,9 +185,12 @@ export async function listProjectEnvVars(
   clerkUserId: string,
   projectId: string
 ): Promise<ProjectEnvVarListResponse> {
-  return requestApi<ProjectEnvVarListResponse>(`/projects/${projectId}/env-vars`, {
-    clerkUserId,
-  })
+  return requestApi<ProjectEnvVarListResponse>(
+    `/projects/${projectId}/env-vars`,
+    {
+      clerkUserId,
+    }
+  )
 }
 
 export async function getDeployment(
@@ -238,6 +245,7 @@ export async function createProjectDeployment(
   projectId: string,
   input?: {
     gitRef?: string
+    environment?: "preview" | "production"
   }
 ): Promise<DeploymentSnapshot> {
   return requestApi<DeploymentSnapshot>(`/projects/${projectId}/deployments`, {
@@ -245,4 +253,11 @@ export async function createProjectDeployment(
     body: input,
     clerkUserId,
   })
+}
+
+export async function getPlatformOverview(userId: string, projectId: string) {
+  return requestApi<import("./types").PlatformOverview>(
+    `/projects/${projectId}/platform`,
+    { clerkUserId: userId }
+  )
 }

@@ -25,7 +25,6 @@ export class WorkerService {
 
       try {
         await this.jobProcessor.process(message);
-
       } catch (error) {
         logger.error("Deployment job processing failed", {
           buildJobId: message.buildJobId,

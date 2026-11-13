@@ -16,8 +16,14 @@ export class DeploymentRepository {
       .limit(1);
 
     if (!deployment) return null;
-    const [detail] = await postgresClient`select x.environment,x.settings,r.github_installation_id::text as installation from deployment_details x join deployments d on d.id=x.deployment_id left join project_releases r on r.project_id=d.project_id where x.deployment_id=${id}`;
-    return { ...deployment, environment: detail?.environment ?? "preview", settings: detail?.settings, githubInstallationId: detail?.installation };
+    const [detail] =
+      await postgresClient`select x.environment,x.settings,r.github_installation_id::text as installation from deployment_details x join deployments d on d.id=x.deployment_id left join project_releases r on r.project_id=d.project_id where x.deployment_id=${id}`;
+    return {
+      ...deployment,
+      environment: detail?.environment ?? "preview",
+      settings: detail?.settings,
+      githubInstallationId: detail?.installation,
+    };
   }
 
   async markBuilding(id: string, now: Date): Promise<void> {
@@ -33,7 +39,11 @@ export class DeploymentRepository {
     `;
   }
 
-  async updateCommitSha(id: string, commitSha: string, now: Date): Promise<void> {
+  async updateCommitSha(
+    id: string,
+    commitSha: string,
+    now: Date,
+  ): Promise<void> {
     await postgresClient`
       update deployments
       set

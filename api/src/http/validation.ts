@@ -5,6 +5,34 @@ export class RequestValidationError extends Error {
   }
 }
 
+export async function readBoundedBody(
+  request: Request,
+  limit = 65_536,
+): Promise<string> {
+  if (Number(request.headers.get("content-length") ?? 0) > limit)
+    throw new RequestValidationError("Request body is too large");
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        throw new RequestValidationError("Request body is too large");
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 interface ParseJsonBodyOptions {
   allowEmpty?: boolean;
 }
@@ -13,7 +41,7 @@ export async function parseJsonBody<T>(
   request: Request,
   options: ParseJsonBodyOptions = {},
 ): Promise<T> {
-  const rawBody = await request.text();
+  const rawBody = await readBoundedBody(request);
 
   if (!rawBody.trim()) {
     if (options.allowEmpty) {
@@ -24,7 +52,10 @@ export async function parseJsonBody<T>(
   }
 
   try {
-    return JSON.parse(rawBody) as T;
+    const value = JSON.parse(rawBody);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Expected object");
+    return value as T;
   } catch {
     throw new RequestValidationError("Invalid request body");
   }
@@ -38,7 +69,10 @@ export function requireString(value: unknown, name: string): string {
   return value;
 }
 
-export function optionalString(value: unknown, name: string): string | undefined {
+export function optionalString(
+  value: unknown,
+  name: string,
+): string | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -100,7 +134,9 @@ export function parsePagination(
   }
 
   if (limit > maxLimit) {
-    throw new RequestValidationError(`limit must be less than or equal to ${maxLimit}`);
+    throw new RequestValidationError(
+      `limit must be less than or equal to ${maxLimit}`,
+    );
   }
 
   if (!Number.isFinite(offset) || offset < 0) {

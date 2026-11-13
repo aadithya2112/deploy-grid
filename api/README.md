@@ -16,10 +16,11 @@ This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) 
 
 ## Docker
 
-Build the image:
+The primary hosted target is the Cloudflare API Worker; see [platform setup](../docs/STATIC_PLATFORM.md).
+The Bun container remains available for local or transitional hosting. Build it **from the repository root**:
 
 ```bash
-docker build -t deploy-grid-api .
+docker build -f api/Dockerfile -t deploy-grid-api .
 ```
 
 Run the container:

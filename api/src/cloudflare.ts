@@ -1,7 +1,15 @@
-import { handleRequest } from "./http-app.ts";
-import { withDatabase } from "./infrastructure/database.ts";
-import { wakeDeploymentWorkerAsync } from "./infrastructure/worker-wake.ts";
 export default {
-  fetch(request: Request) { return withDatabase(() => handleRequest(request)); },
-  async scheduled() { await wakeDeploymentWorkerAsync(); },
+  async fetch(request: Request) {
+    // Load request-dependent database/client setup inside the invocation scope.
+    const [{ handleRequest }, { withDatabase }] = await Promise.all([
+      import("./http-app.ts"),
+      import("./infrastructure/database.ts"),
+    ]);
+    return withDatabase(() => handleRequest(request));
+  },
+  async scheduled() {
+    const { wakeDeploymentWorkerAsync } =
+      await import("./infrastructure/worker-wake.ts");
+    await wakeDeploymentWorkerAsync();
+  },
 };

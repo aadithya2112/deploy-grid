@@ -28,15 +28,27 @@ export async function listDirectoryFiles(
       continue;
     }
 
-    if (entry.isSymbolicLink()) throw new Error("Symlinks are not allowed in deployment artifacts");
+    if (entry.isSymbolicLink())
+      throw new Error("Symlinks are not allowed in deployment artifacts");
     if (!entry.isFile()) continue;
 
     const metadata = await lstat(absolutePath);
-    budget.bytes += metadata.size; budget.files += 1;
-    if (metadata.nlink !== 1 || metadata.size > 25 * 1024 * 1024 || budget.bytes > 100 * 1024 * 1024 || budget.files > 10000) throw new Error("Artifact size/file limit exceeded, or hard link detected");
+    budget.bytes += metadata.size;
+    budget.files += 1;
+    if (
+      metadata.nlink !== 1 ||
+      metadata.size > 25 * 1024 * 1024 ||
+      budget.bytes > 100 * 1024 * 1024 ||
+      budget.files > 10000
+    )
+      throw new Error(
+        "Artifact size/file limit exceeded, or hard link detected",
+      );
     files.push({
       absolutePath,
-      relativePath: normalizeRelativePath(path.relative(basePath, absolutePath)),
+      relativePath: normalizeRelativePath(
+        path.relative(basePath, absolutePath),
+      ),
       contents: await readFile(absolutePath),
       contentType: Bun.file(absolutePath).type || "application/octet-stream",
     });

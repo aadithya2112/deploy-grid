@@ -1,53 +1,34 @@
-# Worker
+# Build supervisor
 
-This service consumes deployment jobs from Upstash Redis, builds React apps in
-isolated temporary directories, uploads build artifacts to Cloudflare R2, and
-updates `deployments`, `build_jobs`, and `deployment_logs` in Postgres.
+The supervisor consumes the durable Postgres/Upstash job queue, checks out a GitHub
+repository, and builds static sites in restricted Docker containers. Supported
+adapters: React/Vite, Vue/Vite, Astro static, and Next.js static export.
 
-## Setup
+See [the platform guide](../docs/STATIC_PLATFORM.md) for architecture, security
+boundaries, configuration, and hosted setup. The hosted runner is GitHub Actions.
+The old Cloud Run supervisor image is retired: it cannot run the Docker backend.
 
-1. Copy `.env.example` to `.env`.
-2. Point the worker at the same `DATABASE_URL`,
-   `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, and
-   `PROJECT_ENV_ENCRYPTION_KEY` used by the API.
-3. Configure Cloudflare R2 credentials and either `ARTIFACT_BASE_URL` or
-   `R2_PUBLIC_BASE_URL`.
+From the repository root:
 
-## Scripts
+```sh
+docker build -f worker/Dockerfile.build -t deploy-grid-builder:local worker
+```
 
-```bash
-bun install
+From `worker/`, install with `bun install --frozen-lockfile`, configure `.env`
+from `.env.example`, and run `bun run start:once` to drain queued work and perform
+retention cleanup. The supervisor must run as a non-root user with Docker access.
+Use a private R2 bucket; hosted site URLs are served by the edge Worker.
+
+Validation commands:
+
+```sh
 bun run typecheck
 bun run test
-bun run start
-bun run smoke
+bun run test:isolation
+bun run test:frameworks
+bun run test:lifecycle
 ```
 
-## Behavior
-
-- Queue payloads follow `../api/src/contracts/deployment-job.ts`.
-- Postgres is treated as the source of truth before any expensive work starts.
-- Build jobs are claimed with a lease and refreshed while the build is running.
-- Transient install/build command failures are retried a small bounded number of times.
-- A recovery loop re-enqueues stale queued jobs and expired running jobs.
-- Deployment logs are streamed into `deployment_logs` with ordered sequences.
-
-## Smoke Test
-
-Use the smoke script to create a deployment through the API and stream logs until
-it finishes:
-
-```bash
-API_BASE_URL=http://localhost:3000 \
-SMOKE_PROJECT_ID=<project-id> \
-bun run smoke
-```
-
-Or create a deployment from a repository URL:
-
-```bash
-API_BASE_URL=http://localhost:3000 \
-SMOKE_REPO_URL=https://github.com/owner/repo.git \
-SMOKE_GIT_REF=main \
-bun run smoke
-```
+The lifecycle check requires the disposable local database described in the guide.
+`bun run smoke` remains available to exercise a configured API and builder together;
+set `API_BASE_URL`, `API_AUTH_TOKEN`, and `SMOKE_PROJECT_ID` for your test project.

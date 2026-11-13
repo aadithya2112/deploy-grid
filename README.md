@@ -1,69 +1,39 @@
 # Deploy Grid
 
-Deploy Grid is a full-stack deployment platform for static/frontend projects.
+A static deployment platform with framework detection, isolated builds, GitHub
+previews, production promotion, and rollback without rebuilding.
 
-At a high level, users connect a repository, trigger deployments, and the system builds the project in a worker, uploads artifacts to object storage, and exposes build status/logs in a web dashboard.
+**Supported:** React/Vite, Vue/Vite, Astro static, Next.js static export.
+SSR and runtime backend servers are intentionally outside this release.
 
-## High-Level Architecture
+- **Dashboard:** Next.js + Clerk, build logs, release management, environment variables.
+- **API:** Cloudflare Workers (or Bun locally), Neon/PostgreSQL, Upstash queue.
+- **Builder:** credentialed supervisor on an ephemeral GitHub Actions runner;
+  repository code runs inside restricted Docker containers.
+- **Delivery:** Cloudflare Worker + private R2, separate deployment hostnames,
+  SPA/multipage routing, immutable artifacts and transactional production aliases.
+- **Reliability:** transactional job creation, duplicate webhook handling,
+  job leases, recovery, cancellation, publication fencing and retryable cleanup.
+- **Cost controls:** build admission quotas, dependency caching, artifact limits,
+  storage reservations, log limits and preview retention.
 
-```mermaid
-flowchart LR
-  U[User] --> W[Web App\nNext.js on Vercel]
-  W -->|Authenticated API calls| A[API Service\nBun/TypeScript]
+## Workflow
 
-  A -->|Read/Write| N[(Neon Postgres)]
-  A -->|Enqueue deployment job| Q[(Upstash Redis Queue)]
+Connect a GitHub repository, create a deployment, inspect its build logs, and
+promote a successful build. GitHub integration deploys default-branch pushes to
+production and creates previews for same-repository PRs. A previous retained
+build can be promoted to roll back without rebuilding.
 
-  WRK[Worker Service\nBun/TypeScript] -->|Poll/consume jobs| Q
-  WRK -->|Read/Write deployment state\nand logs| N
-  WRK -->|Upload build artifacts| R2[(Cloudflare R2)]
+## Development and deployment
 
-  W -->|Shows deployment metadata\nand artifact links| A
-  U -->|Open artifact URL| R2
+See [the static platform guide](docs/STATIC_PLATFORM.md) for architecture, security
+boundaries, local verification, environment variables, GitHub App setup, and the
+Cloudflare cutover procedure. [Implementation tracking](docs/IMPLEMENTATION.md)
+records the intended release scope.
 
-  AUTH[Clerk Auth] --> W
-  AUTH -->|User identity headers| A
-```
+The repository includes real framework fixtures, unit/integration tests, browser
+tests, a Workers runtime smoke test, and Docker isolation/lifecycle tests. CI runs
+these checks without production credentials.
 
-## Core Services
-
-- **Frontend (`web/`)**
-  - Next.js dashboard for projects, deployments, and logs.
-  - Uses Clerk for authentication.
-  - Calls API for all project/deployment operations.
-
-- **API (`api/`)**
-  - Handles project/deployment CRUD and validation.
-  - Persists state in Neon Postgres.
-  - Pushes build jobs to Upstash Redis queue.
-  - Exposes health and deployment/log endpoints.
-
-- **Worker (`worker/`)**
-  - Continuously consumes queued deployment jobs.
-  - Clones repo, installs dependencies, runs build.
-  - Uploads output artifacts to Cloudflare R2.
-  - Updates deployment status/logs in Neon Postgres.
-
-## Data & Infrastructure
-
-- **Neon Postgres**: source of truth for projects, deployments, build jobs, and logs.
-- **Upstash Redis**: job queue between API and worker.
-- **Cloudflare R2**: stores build artifacts (`index.html`, JS/CSS assets, etc.).
-- **Vercel**: hosts the frontend.
-- **Azure Container Apps / VM (typical setup)**: hosts API and worker.
-
-## Deployment Flow (High Level)
-
-1. User creates a deployment from the web app.
-2. API creates deployment/build-job records in Neon and enqueues a job in Upstash.
-3. Worker picks the job, runs build steps, and uploads artifacts to R2.
-4. Worker marks deployment as ready/failed and stores logs in Neon.
-5. Web app displays live deployment status and artifact URL to the user.
-
-## Repository Structure
-
-- [api/](api/)
-- [worker/](worker/)
-- [web/](web/)
-
-This README is intentionally high-level. See service-level READMEs inside each folder for implementation details.
+Hosted activation requires configuring the GitHub App, secrets, private bucket,
+and site domain. Checked-in example configuration is not a live deployment.

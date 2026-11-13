@@ -179,7 +179,12 @@ export type Project = typeof projects.$inferSelect;
 export type Deployment = typeof deployments.$inferSelect & {
   githubInstallationId?: string;
   environment?: "preview" | "production";
-  settings?: { rootDirectory: string | null; installCommand: string | null; buildCommand: string | null; outputDirectory: string | null };
+  settings?: {
+    rootDirectory: string | null;
+    installCommand: string | null;
+    buildCommand: string | null;
+    outputDirectory: string | null;
+  };
 };
 export type BuildJob = typeof buildJobs.$inferSelect;
 export type DeploymentLog = typeof deploymentLogs.$inferSelect;

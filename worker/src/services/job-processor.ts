@@ -3,7 +3,12 @@ import { installationToken } from "../../../shared/github.ts";
 import { detectFramework } from "../build/framework.ts";
 import { env } from "../config/env.ts";
 import type { DeploymentJobMessage } from "../contracts/deployment-job.ts";
-import type { BuildJob, Deployment, Project, ProjectEnvVar } from "../db/schema.ts";
+import type {
+  BuildJob,
+  Deployment,
+  Project,
+  ProjectEnvVar,
+} from "../db/schema.ts";
 import { cleanupDirectory } from "../build/fs.ts";
 import type { CommandRunner } from "../build/command-runner.ts";
 import { resolveBuildCommands } from "../build/command-resolution.ts";
@@ -28,7 +33,8 @@ import {
 import { resolveBuildEnvironment } from "./env-resolution.ts";
 
 function sanitizeErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "Unknown worker error";
+  const message =
+    error instanceof Error ? error.message : "Unknown worker error";
   return message.replace(/\s+/g, " ").trim().slice(0, 1_000);
 }
 
@@ -37,11 +43,15 @@ interface ProcessorDependencies {
     BuildJobRepository,
     "findById" | "claim" | "refreshLease" | "releaseClaim"
   >;
-  deploymentRepository: Pick<DeploymentRepository, "findById" | "updateCommitSha">;
+  deploymentRepository: Pick<
+    DeploymentRepository,
+    "findById" | "updateCommitSha"
+  >;
   projectRepository: Pick<ProjectRepository, "findById">;
   projectEnvVarRepository: Pick<ProjectEnvVarRepository, "listByProjectId">;
   deploymentLogRepository: DeploymentLogRepositoryLike;
   workerStateRepository: {
+    reserveArtifacts(deploymentId: string, bytes: number): Promise<void>;
     markBuilding(deploymentId: string, now: Date): Promise<void>;
     finalizeSuccess(input: {
       deploymentId: string;
@@ -69,7 +79,10 @@ interface ProcessorDependencies {
     input: CheckoutRepositoryInput,
   ) => Promise<CheckoutRepositoryResult>;
   now?: () => Date;
-  onStatus?: (deploymentId: string, status: "pending" | "success" | "failure") => Promise<void>;
+  onStatus?: (
+    deploymentId: string,
+    status: "pending" | "success" | "failure",
+  ) => Promise<void>;
 }
 
 function getResolvedProjectSetting(
@@ -149,7 +162,9 @@ export class JobProcessor {
       return;
     }
 
-    if (shouldSkipProcessing(state.buildJob, state.deployment, env.workerId, now)) {
+    if (
+      shouldSkipProcessing(state.buildJob, state.deployment, env.workerId, now)
+    ) {
       logger.info("Skipping non-actionable deployment job", {
         buildJobId: state.buildJob.id,
         deploymentId: state.deployment.id,
@@ -159,7 +174,9 @@ export class JobProcessor {
       return;
     }
 
-    const leaseUntil = new Date(now.getTime() + env.buildJobLeaseSeconds * 1_000);
+    const leaseUntil = new Date(
+      now.getTime() + env.buildJobLeaseSeconds * 1_000,
+    );
     const claimedJob = await this.dependencies.buildJobRepository.claim({
       jobId: state.buildJob.id,
       claimedBy: env.workerId,
@@ -182,6 +199,10 @@ export class JobProcessor {
     );
 
     const cancellation = new AbortController();
+    const buildDeadline = setTimeout(
+      () => cancellation.abort(),
+      env.buildTimeoutSeconds * 1_000,
+    );
     const started = performance.now();
     const metrics: Record<string, number> = {};
     const artifactId = `${state.deployment.id}/${crypto.randomUUID()}`;
@@ -191,7 +212,10 @@ export class JobProcessor {
     let claimReleased = false;
 
     try {
-      await this.dependencies.workerStateRepository.markBuilding(state.deployment.id, now);
+      await this.dependencies.workerStateRepository.markBuilding(
+        state.deployment.id,
+        now,
+      );
       await logWriter.system(`job claimed by ${env.workerId}`);
       await logWriter.system("build started");
 
@@ -202,7 +226,12 @@ export class JobProcessor {
         );
 
         void this.dependencies.buildJobRepository
-          .refreshLease(claimedJob.id, env.workerId, nextLeaseUntil, heartbeatNow)
+          .refreshLease(
+            claimedJob.id,
+            env.workerId,
+            nextLeaseUntil,
+            heartbeatNow,
+          )
           .then((refreshed) => {
             if (!refreshed) {
               cancellation.abort();
@@ -225,7 +254,19 @@ export class JobProcessor {
       await logWriter.system("clone started");
 
       const settings = state.deployment.settings ?? state.project;
-      const gitToken = state.deployment.githubInstallationId ? await installationToken(state.deployment.githubInstallationId) : undefined;
+      const resolveSetting = (
+        key:
+          | "rootDirectory"
+          | "installCommand"
+          | "buildCommand"
+          | "outputDirectory",
+      ) =>
+        state.deployment.settings
+          ? settings[key]?.trim() || null
+          : getResolvedProjectSetting(settings[key], message[key]);
+      const gitToken = state.deployment.githubInstallationId
+        ? await installationToken(state.deployment.githubInstallationId)
+        : undefined;
       if (gitToken) logWriter.setSecretsToRedact([gitToken]);
       const checkout = await this.dependencies.checkoutRepository({
         gitToken,
@@ -233,10 +274,7 @@ export class JobProcessor {
         repoUrl: state.project.repoUrl || message.repoUrl,
         gitRef: state.deployment.gitRef || message.gitRef,
         tmpBaseDir: env.workerTmpDir,
-        rootDirectory: getResolvedProjectSetting(
-          settings.rootDirectory,
-          message.rootDirectory,
-        ),
+        rootDirectory: resolveSetting("rootDirectory"),
         commandRunner: this.dependencies.commandRunner,
         onStdout: (line) => logWriter.stdout(line),
         onStderr: (line) => logWriter.stderr(line),
@@ -255,32 +293,30 @@ export class JobProcessor {
       await logWriter.system(`resolved commit ${checkout.commitSha}`);
 
       metrics.cloneMs = performance.now() - started;
-      const buildEnv = await resolveBuildEnvironment(state.projectEnvVars, state.deployment.environment ?? "preview");
+      const buildEnv = await resolveBuildEnvironment(
+        state.projectEnvVars,
+        state.deployment.environment ?? "preview",
+      );
       const redactionValues = Object.values(buildEnv).filter(Boolean);
       secrets = redactionValues;
       logWriter.setSecretsToRedact(redactionValues);
 
       const framework = await detectFramework(checkout.buildDir);
-      await logWriter.system(`framework=${framework.framework} routing=${framework.routing}`);
+      await logWriter.system(
+        `framework=${framework.framework} routing=${framework.routing}`,
+      );
       const buildCommands = await resolveBuildCommands(checkout.buildDir, {
-        installCommand: getResolvedProjectSetting(
-          settings.installCommand,
-          message.installCommand,
-        ),
-        buildCommand: getResolvedProjectSetting(
-          settings.buildCommand,
-          message.buildCommand,
-        ),
-        outputDirectory: getResolvedProjectSetting(
-          settings.outputDirectory,
-          message.outputDirectory,
-        ),
+        installCommand: resolveSetting("installCommand"),
+        buildCommand: resolveSetting("buildCommand"),
+        outputDirectory: resolveSetting("outputDirectory"),
       });
 
       await logWriter.system(
         `selected package manager=${buildCommands.packageManager} install=${buildCommands.installCommand}`,
       );
-      await logWriter.system(`selected build command=${buildCommands.buildCommand}`);
+      await logWriter.system(
+        `selected build command=${buildCommands.buildCommand}`,
+      );
       await logWriter.system("dependencies install started");
       const installStarted = performance.now();
 
@@ -330,21 +366,34 @@ export class JobProcessor {
 
       const artifactDirectory = await resolveArtifactDirectory(
         checkout.buildDir,
-        buildCommands.outputDirectory ?? (framework.framework === "static" ? null : framework.outputDirectory),
+        buildCommands.outputDirectory ??
+          (framework.framework === "static" ? null : framework.outputDirectory),
       );
 
-      await logWriter.system(`artifact upload started from ${path.basename(artifactDirectory)}`);
+      await logWriter.system(
+        `artifact upload started from ${path.basename(artifactDirectory)}`,
+      );
 
       const artifactUrl = await uploadArtifactDirectory(
         this.dependencies.artifactStorage,
         artifactId,
         artifactDirectory,
         framework,
+        async (usage) => {
+          metrics.artifactBytes = usage.bytes;
+          metrics.artifactFiles = usage.files;
+          await this.dependencies.workerStateRepository.reserveArtifacts(
+            state.deployment.id,
+            usage.bytes,
+          );
+        },
       );
 
       await logWriter.system("artifact upload completed");
 
       const finishedAt = this.dependencies.now?.() ?? new Date();
+      if (cancellation.signal.aborted)
+        throw new Error("Build cancelled or time budget exceeded");
       await this.dependencies.workerStateRepository.finalizeSuccess({
         deploymentId: state.deployment.id,
         buildJobId: claimedJob.id,
@@ -363,7 +412,8 @@ export class JobProcessor {
       claimReleased = true;
     } catch (error: unknown) {
       let errorMessage = sanitizeErrorMessage(error);
-      for (const secret of secrets) errorMessage = errorMessage.split(secret).join("[REDACTED]");
+      for (const secret of secrets)
+        errorMessage = errorMessage.split(secret).join("[REDACTED]");
 
       await this.dependencies.workerStateRepository.finalizeFailure({
         deploymentId: state.deployment.id,
@@ -385,8 +435,9 @@ export class JobProcessor {
       }
 
       claimReleased = true;
-      throw error;
+      throw new Error(errorMessage);
     } finally {
+      clearTimeout(buildDeadline);
       if (heartbeat) {
         clearInterval(heartbeat);
       }

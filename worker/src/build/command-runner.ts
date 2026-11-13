@@ -1,5 +1,6 @@
 export interface RunCommandOptions {
   command: string;
+  argv?: string[];
   workspaceDir?: string;
   cacheKey?: string;
   signal?: AbortSignal;
@@ -86,7 +87,7 @@ export class BunCommandRunner implements CommandRunner {
   async run(options: RunCommandOptions): Promise<RunCommandResult> {
     const stdoutLines: string[] = [];
     const stderrLines: string[] = [];
-    const child = Bun.spawn(["sh", "-lc", options.command], {
+    const child = Bun.spawn(options.argv ?? ["sh", "-lc", options.command], {
       cwd: options.cwd,
       env: {
         PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
@@ -121,7 +122,9 @@ export class BunCommandRunner implements CommandRunner {
               new Promise<never>((_, reject) => {
                 timeoutHandle = setTimeout(() => {
                   child.kill("SIGTERM");
-                  reject(new Error(`Command timed out after ${options.timeoutMs}ms`));
+                  reject(
+                    new Error(`Command timed out after ${options.timeoutMs}ms`),
+                  );
                 }, options.timeoutMs);
               }),
             ]);

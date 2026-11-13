@@ -5,5 +5,5 @@
   "compatibility_date": "2026-11-13",
   "compatibility_flags": ["nodejs_compat"],
   "vars": { "SITES_DOMAIN": "sites.example.com", "MAX_BUILDS_PER_DAY": "20" },
-  "observability": { "enabled": true, "traces": { "enabled": true } }
+  "observability": { "enabled": true, "traces": { "enabled": true } },
 }

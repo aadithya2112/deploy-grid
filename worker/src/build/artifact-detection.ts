@@ -50,7 +50,9 @@ export async function resolveArtifactDirectory(
 
   const candidates = configuredCandidate
     ? [configuredCandidate]
-    : defaultOutputDirectories.map((candidate) => path.join(buildDir, candidate));
+    : defaultOutputDirectories.map((candidate) =>
+        path.join(buildDir, candidate),
+      );
 
   for (const candidate of candidates) {
     if (!(await directoryExists(candidate))) {
@@ -59,7 +61,10 @@ export async function resolveArtifactDirectory(
 
     const resolved = await realpath(candidate);
     const root = await realpath(buildDir);
-    if (!resolved.startsWith(`${root}${path.sep}`)) throw new Error("Artifact directory must be inside the project, not its root or an external symlink");
+    if (!resolved.startsWith(`${root}${path.sep}`))
+      throw new Error(
+        "Artifact directory must be inside the project, not its root or an external symlink",
+      );
 
     if (!(await directoryHasFiles(candidate))) {
       continue;

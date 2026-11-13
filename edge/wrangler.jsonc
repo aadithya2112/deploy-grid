@@ -6,8 +6,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "secrets": { "required": ["ROUTING_SECRET"] },
-  "r2_buckets": [{ "binding": "ARTIFACTS", "bucket_name": "deploy-grid-artifacts" }],
+  "r2_buckets": [
+    { "binding": "ARTIFACTS", "bucket_name": "deploy-grid-artifacts" },
+  ],
   "services": [{ "binding": "API", "service": "deploy-grid-api" }],
   "vars": { "SITES_DOMAIN": "sites.example.com" },
-  "observability": { "enabled": true, "traces": { "enabled": true } }
+  "observability": { "enabled": true, "traces": { "enabled": true } },
 }

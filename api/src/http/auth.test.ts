@@ -3,10 +3,9 @@ import { authorizeRequest } from "./auth.ts";
 
 describe("authorizeRequest", () => {
   test("allows public health requests", () => {
-    const response = authorizeRequest(
-      new Request("http://localhost/health"),
-      { expectedToken: "secret-token" },
-    );
+    const response = authorizeRequest(new Request("http://localhost/health"), {
+      expectedToken: "secret-token",
+    });
 
     expect(response).toBeNull();
   });

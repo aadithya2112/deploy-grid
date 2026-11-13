@@ -2,12 +2,16 @@ import { describe, expect, mock, test } from "bun:test";
 import type { Project } from "../db/schema.ts";
 import { DeploymentService } from "./deployment.service.ts";
 
-function createService(...args: ConstructorParameters<typeof DeploymentService>) {
+function createService(
+  ...args: ConstructorParameters<typeof DeploymentService>
+) {
   const [repository, projects, jobs, logs, queue] = args;
-  return new DeploymentService(repository, projects, jobs, logs, queue, { createQueued: async (deployment) => {
-    await repository.create(deployment);
-    return jobs.create(deployment.id);
-  } });
+  return new DeploymentService(repository, projects, jobs, logs, queue, {
+    createQueued: async (deployment) => {
+      await repository.create(deployment);
+      return jobs.create(deployment.id);
+    },
+  });
 }
 
 function createProject(overrides: Partial<Project> = {}): Project {
@@ -84,7 +88,10 @@ describe("DeploymentService", () => {
       { enqueue } as never,
     );
 
-    const deployment = await service.createDeployment("user_123", project.repoUrl);
+    const deployment = await service.createDeployment(
+      "user_123",
+      project.repoUrl,
+    );
 
     expect(findByRepoUrl).toHaveBeenCalledWith(project.repoUrl, "user_123");
     expect(createOrGet).not.toHaveBeenCalled();
@@ -215,7 +222,10 @@ describe("DeploymentService", () => {
       } as never,
     );
 
-    const deployment = await service.createDeployment("user_123", project.repoUrl);
+    const deployment = await service.createDeployment(
+      "user_123",
+      project.repoUrl,
+    );
 
     expect(createDeployment).toHaveBeenCalledTimes(1);
     expect(updateDeployment).not.toHaveBeenCalled();
@@ -257,9 +267,9 @@ describe("DeploymentService", () => {
       {} as never,
     );
 
-    await expect(service.getDeployment(createdDeployment.id, "user_123")).resolves.toBe(
-      createdDeployment,
-    );
+    await expect(
+      service.getDeployment(createdDeployment.id, "user_123"),
+    ).resolves.toBe(createdDeployment);
   });
 
   test("throws a not found error when the deployment does not exist", async () => {
@@ -275,9 +285,9 @@ describe("DeploymentService", () => {
       {} as never,
     );
 
-    await expect(service.getDeployment("missing-id", "user_123")).rejects.toThrow(
-      "Deployment missing-id not found",
-    );
+    await expect(
+      service.getDeployment("missing-id", "user_123"),
+    ).rejects.toThrow("Deployment missing-id not found");
   });
 
   test("treats deployments from another user as not found", async () => {
@@ -296,8 +306,8 @@ describe("DeploymentService", () => {
       {} as never,
     );
 
-    await expect(service.getDeployment("deployment-123", "user_456")).rejects.toThrow(
-      "Deployment deployment-123 not found",
-    );
+    await expect(
+      service.getDeployment("deployment-123", "user_456"),
+    ).rejects.toThrow("Deployment deployment-123 not found");
   });
 });

@@ -1,4 +1,8 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http"
 
 interface ProjectSnapshot {
   id: string
@@ -99,7 +103,9 @@ function sendJson(response: ServerResponse, status: number, body: unknown) {
   response.end(JSON.stringify(body))
 }
 
-async function parseJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function parseJson(
+  request: IncomingMessage
+): Promise<Record<string, unknown>> {
   const chunks: Uint8Array[] = []
 
   for await (const chunk of request) {
@@ -110,6 +116,20 @@ async function parseJson(request: IncomingMessage): Promise<Record<string, unkno
   return body ? (JSON.parse(body) as Record<string, unknown>) : {}
 }
 
+const managedProject = {
+  ...seededProject,
+  id: "12345678-1234-1234-1234-123456789012",
+  name: "Managed App",
+}
+projects.set(managedProject.id, managedProject)
+const managedDeployment = {
+  ...seededDeployment,
+  id: "22345678-1234-1234-1234-123456789012",
+  projectId: managedProject.id,
+}
+deployments.set(managedDeployment.id, managedDeployment)
+let liveDeployment: string | null = null
+
 const server = createServer(async (request, response) => {
   if (!request.url || !request.method) {
     sendJson(response, 400, { error: "Invalid request" })
@@ -118,6 +138,38 @@ const server = createServer(async (request, response) => {
 
   const url = new URL(request.url, `http://127.0.0.1:${port}`)
 
+  if (url.pathname === `/projects/${managedProject.id}/platform`) {
+    sendJson(response, 200, {
+      release: {
+        deploymentId: liveDeployment,
+        repository: null,
+        installationId: null,
+      },
+      productionUrl: "https://production.example.com",
+      history: [],
+      builds: [
+        {
+          id: managedDeployment.id,
+          environment: "preview",
+          framework: "react-vite",
+          metrics: { totalMs: 1000 },
+          pullRequest: null,
+          expiresAt: null,
+          deletedAt: null,
+        },
+      ],
+    })
+    return
+  }
+  if (
+    request.method === "POST" &&
+    url.pathname === `/projects/${managedProject.id}/promote`
+  ) {
+    const body = await parseJson(request)
+    liveDeployment = String(body.deploymentId)
+    sendJson(response, 200, { deploymentId: liveDeployment })
+    return
+  }
   if (request.method === "GET" && url.pathname === "/health") {
     sendJson(response, 200, { status: "ok", database: "ok" })
     return
@@ -142,16 +194,21 @@ const server = createServer(async (request, response) => {
     const project: ProjectSnapshot = {
       id,
       slug: id,
-      name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : id,
+      name:
+        typeof body.name === "string" && body.name.trim()
+          ? body.name.trim()
+          : id,
       repoUrl: String(body.repoUrl),
       defaultBranch:
         typeof body.defaultBranch === "string" && body.defaultBranch.trim()
           ? body.defaultBranch.trim()
           : "main",
-      rootDirectory: typeof body.rootDirectory === "string" ? body.rootDirectory : null,
+      rootDirectory:
+        typeof body.rootDirectory === "string" ? body.rootDirectory : null,
       installCommand:
         typeof body.installCommand === "string" ? body.installCommand : null,
-      buildCommand: typeof body.buildCommand === "string" ? body.buildCommand : null,
+      buildCommand:
+        typeof body.buildCommand === "string" ? body.buildCommand : null,
       outputDirectory:
         typeof body.outputDirectory === "string" ? body.outputDirectory : null,
       createdAt: now(),
@@ -163,7 +220,32 @@ const server = createServer(async (request, response) => {
     return
   }
 
-  const createDeploymentMatch = /^\/projects\/([^/]+)\/deployments$/.exec(url.pathname)
+  const projectRead = /^\/projects\/([^/]+)(?:\/(deployments|env-vars))?$/.exec(
+    url.pathname
+  )
+  if (request.method === "GET" && projectRead) {
+    const project = projects.get(projectRead[1]!)
+    if (!project) {
+      sendJson(response, 404, { error: "Project not found" })
+      return
+    }
+    if (projectRead[2] === "deployments")
+      sendJson(response, 200, {
+        deployments: Array.from(deployments.values()).filter(
+          (item) => item.projectId === project.id
+        ),
+        projectId: project.id,
+        pageInfo: { limit: 20, offset: 0, hasMore: false, nextOffset: null },
+      })
+    else if (projectRead[2] === "env-vars")
+      sendJson(response, 200, { projectId: project.id, envVars: [] })
+    else sendJson(response, 200, project)
+    return
+  }
+
+  const createDeploymentMatch = /^\/projects\/([^/]+)\/deployments$/.exec(
+    url.pathname
+  )
   if (request.method === "POST" && createDeploymentMatch) {
     const [, projectId] = createDeploymentMatch
     const project = projectId ? projects.get(projectId) : null
@@ -235,7 +317,7 @@ const server = createServer(async (request, response) => {
   const logsMatch = /^\/deployments\/([^/]+)\/logs$/.exec(url.pathname)
   if (request.method === "GET" && logsMatch) {
     const [, deploymentId] = logsMatch
-    const logs = deploymentId ? deploymentLogs.get(deploymentId) ?? [] : []
+    const logs = deploymentId ? (deploymentLogs.get(deploymentId) ?? []) : []
     const afterSequence = Number(url.searchParams.get("afterSequence") ?? "-1")
 
     sendJson(response, 200, {

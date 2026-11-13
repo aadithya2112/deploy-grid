@@ -2,7 +2,7 @@ name: Deployment builds
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 * * * *'
+    - cron: "17 * * * *"
 permissions:
   contents: read
 concurrency:
@@ -24,12 +24,13 @@ jobs:
       - name: Build restricted runner image
         run: docker build -f worker/Dockerfile.build -t deploy-grid-builder:local worker
       - name: Block build-container access to private networks and metadata
-        run: |
-          for cidr in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10; do
-            sudo iptables -I DOCKER-USER -d "$cidr" -j REJECT
-          done
-          # Block access to services on the runner itself. Docker DNS remains available.
-          sudo iptables -I INPUT -i docker0 -j REJECT
+        run: bash worker/scripts/restrict-build-network.sh
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/deploy-grid/cache
+          key: ${{ runner.os }}-dg-${{ hashFiles('worker/Dockerfile.build') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-dg-${{ hashFiles('worker/Dockerfile.build') }}-
       - name: Drain queued deployments and recover interrupted builds
         working-directory: worker
         env:

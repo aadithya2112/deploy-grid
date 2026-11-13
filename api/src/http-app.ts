@@ -1,5 +1,8 @@
 import { PlatformRoutes } from "./routes/platform.routes.ts";
-import { PlatformError, PlatformRepository } from "./repositories/platform.repository.ts";
+import {
+  PlatformError,
+  PlatformRepository,
+} from "./repositories/platform.repository.ts";
 import { handleGitHubWebhook } from "./services/github.service.ts";
 import { RequestValidationError } from "./http/validation.ts";
 import { RequestContextError } from "./http/request-context.ts";
@@ -54,14 +57,25 @@ const port = env.port;
 export async function handleRequest(request: Request): Promise<Response> {
   try {
     const path = new URL(request.url).pathname;
-    if (request.method === "POST" && path === "/webhooks/github") return await handleGitHubWebhook(request, service);
+    if (request.method === "POST" && path === "/webhooks/github")
+      return await handleGitHubWebhook(request, service);
     if (path.startsWith("/internal/sites/")) {
-      const authError = authorizeRequest(request, { expectedToken: process.env.ROUTING_SECRET, publicPaths: [] });
+      const authError = authorizeRequest(request, {
+        expectedToken: process.env.ROUTING_SECRET ?? null,
+        publicPaths: [],
+      });
       if (authError) return authError;
       const label = path.slice("/internal/sites/".length);
-      if (!/^[dp]-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(label)) return new Response(null, { status: 404 });
+      if (
+        !/^[dp]-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+          label,
+        )
+      )
+        return new Response(null, { status: 404 });
       const site = await new PlatformRepository().resolveSite(label);
-      return site ? Response.json(site, { headers: { "Cache-Control": "no-store" } }) : new Response(null, { status: 404 });
+      return site
+        ? Response.json(site, { headers: { "Cache-Control": "no-store" } })
+        : new Response(null, { status: 404 });
     }
 
     const authError = authorizeRequest(request);
@@ -80,8 +94,24 @@ export async function handleRequest(request: Request): Promise<Response> {
 
     return Response.json({ error: "Not found" }, { status: 404 });
   } catch (error) {
-    const status = error instanceof PlatformError ? error.status : error instanceof RequestContextError ? 401 : error instanceof RequestValidationError ? 400 : 500;
-    if (status === 500) console.error("API request failed", { error: error instanceof Error ? error.name : "unknown" });
-    return Response.json({ error: status === 500 ? "Internal server error" : (error as Error).message }, { status });
+    const status =
+      error instanceof PlatformError
+        ? error.status
+        : error instanceof RequestContextError
+          ? 401
+          : error instanceof RequestValidationError
+            ? 400
+            : 500;
+    if (status === 500)
+      console.error("API request failed", {
+        error: error instanceof Error ? error.name : "unknown",
+      });
+    return Response.json(
+      {
+        error:
+          status === 500 ? "Internal server error" : (error as Error).message,
+      },
+      { status },
+    );
   }
 }
