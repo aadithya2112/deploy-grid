@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "deploy-grid-api",
+  "main": "src/cloudflare.ts",
+  "compatibility_date": "2026-11-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": { "SITES_DOMAIN": "sites.example.com", "MAX_BUILDS_PER_DAY": "20" },
+  "observability": { "enabled": true, "traces": { "enabled": true } }
+}

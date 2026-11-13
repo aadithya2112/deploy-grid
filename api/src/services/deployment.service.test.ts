@@ -2,6 +2,14 @@ import { describe, expect, mock, test } from "bun:test";
 import type { Project } from "../db/schema.ts";
 import { DeploymentService } from "./deployment.service.ts";
 
+function createService(...args: ConstructorParameters<typeof DeploymentService>) {
+  const [repository, projects, jobs, logs, queue] = args;
+  return new DeploymentService(repository, projects, jobs, logs, queue, { createQueued: async (deployment) => {
+    await repository.create(deployment);
+    return jobs.create(deployment.id);
+  } });
+}
+
 function createProject(overrides: Partial<Project> = {}): Project {
   return {
     id: "project-123",
@@ -22,7 +30,7 @@ function createProject(overrides: Partial<Project> = {}): Project {
 
 describe("DeploymentService", () => {
   test("rejects blank repo URLs", async () => {
-    const service = new DeploymentService(
+    const service = createService(
       {} as never,
       {} as never,
       {} as never,
@@ -58,7 +66,7 @@ describe("DeploymentService", () => {
       id: "job-123",
     }));
     const enqueue = mock(async (_job: unknown) => {});
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: createDeployment,
         findById: async () => null,
@@ -114,7 +122,7 @@ describe("DeploymentService", () => {
       id: "job-123",
     }));
     const enqueue = mock(async (_job: unknown) => {});
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: createDeployment,
         findById: async () => null,
@@ -148,7 +156,7 @@ describe("DeploymentService", () => {
       defaultBranch: "main",
     });
     const enqueue = mock(async () => {});
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: async () => {},
         findById: async () => null,
@@ -180,12 +188,12 @@ describe("DeploymentService", () => {
     );
   });
 
-  test("marks the deployment and build job as failed if enqueueing fails", async () => {
+  test("keeps the durable queued job recoverable if enqueueing fails", async () => {
     const project = createProject();
     const createDeployment = mock(async () => {});
     const updateDeployment = mock(async () => {});
     const markFailed = mock(async () => {});
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: createDeployment,
         findById: async () => null,
@@ -210,15 +218,15 @@ describe("DeploymentService", () => {
     const deployment = await service.createDeployment("user_123", project.repoUrl);
 
     expect(createDeployment).toHaveBeenCalledTimes(1);
-    expect(updateDeployment).toHaveBeenCalledTimes(1);
-    expect(deployment.status).toBe("failed");
-    expect(deployment.errorMessage).toBe("queue offline");
-    expect(markFailed).toHaveBeenCalledWith("job-123", "queue offline");
+    expect(updateDeployment).not.toHaveBeenCalled();
+    expect(deployment.status).toBe("queued");
+    expect(deployment.errorMessage).toBeNull();
+    expect(markFailed).not.toHaveBeenCalled();
   });
 
   test("returns an existing deployment by id", async () => {
     const project = createProject();
-    const createdDeployment = await new DeploymentService(
+    const createdDeployment = await createService(
       {
         create: async () => {},
         findById: async () => null,
@@ -236,7 +244,7 @@ describe("DeploymentService", () => {
       { enqueue: async () => {} } as never,
     ).createDeployment("user_123", project.repoUrl);
 
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: async () => {},
         findById: async (id: string) =>
@@ -255,7 +263,7 @@ describe("DeploymentService", () => {
   });
 
   test("throws a not found error when the deployment does not exist", async () => {
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: async () => {},
         findById: async () => null,
@@ -273,7 +281,7 @@ describe("DeploymentService", () => {
   });
 
   test("treats deployments from another user as not found", async () => {
-    const service = new DeploymentService(
+    const service = createService(
       {
         create: async () => {},
         findById: async (_id: string, clerkUserId?: string) => {

@@ -1,3 +1,5 @@
+import { reportGitHubStatus } from "./src/services/github-status.ts"
+import { DockerCommandRunner } from "./src/build/docker-command-runner.ts"
 import { BunCommandRunner } from "./src/build/command-runner.ts"
 import { checkoutRepository } from "./src/build/repository-checkout.ts"
 import { env } from "./src/config/env.ts"
@@ -24,9 +26,10 @@ const projectEnvVarRepository = new ProjectEnvVarRepository()
 const deploymentLogRepository = new DeploymentLogRepository()
 const workerStateRepository = new WorkerStateRepository()
 const artifactStorage = new ArtifactStorage()
-const commandRunner = new BunCommandRunner()
+const commandRunner = new DockerCommandRunner()
 
 const jobProcessor = new JobProcessor({
+  onStatus: reportGitHubStatus,
   buildJobRepository,
   deploymentRepository,
   projectRepository,
@@ -35,7 +38,7 @@ const jobProcessor = new JobProcessor({
   workerStateRepository,
   artifactStorage,
   commandRunner,
-  checkoutRepository,
+  checkoutRepository: (input) => checkoutRepository({ ...input, commandRunner: new BunCommandRunner() }),
 })
 
 const recoveryLoop = new RecoveryLoop({
@@ -62,11 +65,16 @@ function scheduleProcessUntilIdle(): Promise<{ processed: number }> {
 const WORKER_WAKE_TOKEN_HEADER = "X-Worker-Wake-Token"
 
 function isAuthorized(request: Request): boolean {
-  if (!env.workerWakeSecret) {
-    return true
-  }
+  if (!env.workerWakeSecret) return false
 
   return request.headers.get(WORKER_WAKE_TOKEN_HEADER) === env.workerWakeSecret
+}
+
+if (process.argv.includes("--once")) {
+  await workerService.processUntilIdle();
+  const { sql } = await import("./src/infrastructure/database.ts");
+  await sql.end();
+  process.exit(0);
 }
 
 const server = Bun.serve({

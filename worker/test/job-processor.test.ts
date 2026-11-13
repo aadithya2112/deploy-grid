@@ -28,6 +28,7 @@ async function createWorkspace(
     path.join(testTmpRoot, "deploy-grid-worker-repo-"),
   )
 
+  await writeFile(path.join(repoDir, "package.json"), JSON.stringify({ scripts: { build: "echo build" } }));
   for (const [relativePath, contents] of Object.entries(files)) {
     const filePath = path.join(repoDir, relativePath)
     await mkdir(path.dirname(filePath), { recursive: true })
@@ -436,15 +437,10 @@ describe("JobProcessor", () => {
     expect(harness.state.buildJob.status).toBe("succeeded")
     expect(harness.state.deployment.commitSha).toBe(repo.commitSha)
     expect(harness.state.deployment.artifactUrl).toBe(
-      "https://artifacts.example.com/deployments/deployment-2/index.html",
+      "https://preview.example.com/deployment-2",
     )
-    expect(uploadedKeys).toEqual(
-      expect.arrayContaining([
-        "deployments/deployment-2/index.html",
-        "deployments/deployment-2/assets/index.js",
-        "assets/index.js",
-      ]),
-    )
+    expect(uploadedKeys.every(key => key.startsWith("deployments/deployment-2/"))).toBe(true)
+    expect(uploadedKeys.at(-1)).toEndWith("/_deploy-grid.json")
     expect(uploadedKeys).toHaveLength(3)
     expect(
       harness.logRepository.entries.map((entry) => entry.message),

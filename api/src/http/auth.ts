@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { env } from "../config/env.ts";
 
 interface AuthorizeRequestOptions {
@@ -16,13 +17,19 @@ export function authorizeRequest(
   const publicPaths = options.publicPaths ?? ["/health"];
   const path = new URL(request.url).pathname;
 
-  if (!expectedToken || publicPaths.includes(path)) {
+  if (publicPaths.includes(path)) {
     return null;
+  }
+
+  if (!expectedToken) {
+    return Response.json({ error: "API authentication is not configured" }, { status: 503 });
   }
 
   const authorization = request.headers.get("authorization");
 
-  if (!authorization || authorization !== `Bearer ${expectedToken}`) {
+  const expected = Buffer.from(`Bearer ${expectedToken}`);
+  const supplied = Buffer.from(authorization ?? "");
+  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

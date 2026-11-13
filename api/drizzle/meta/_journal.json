@@ -29,6 +29,13 @@
       "when": 1774317000000,
       "tag": "0003_curious_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794528000000,
+      "tag": "0004_static_platform",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { installationToken, githubRequest } from "../../../shared/github.ts";
 import { env } from "../config/env.ts";
 import { logger } from "./logger.ts";
 
@@ -29,11 +30,11 @@ async function getCloudRunIdentityToken(audience: string): Promise<string | null
   }
 }
 
-async function buildWakeHeaders(wakeUrl: string): Promise<HeadersInit> {
+async function buildWakeHeaders(wakeUrl: string, secret: string | null): Promise<HeadersInit> {
   const headers: Record<string, string> = {};
 
-  if (env.workerWakeSecret) {
-    headers[WORKER_WAKE_TOKEN_HEADER] = env.workerWakeSecret;
+  if (secret) {
+    headers[WORKER_WAKE_TOKEN_HEADER] = secret;
   }
 
   const audience = new URL(wakeUrl).origin;
@@ -46,8 +47,13 @@ async function buildWakeHeaders(wakeUrl: string): Promise<HeadersInit> {
   return headers;
 }
 
-export async function wakeDeploymentWorkerAsync(): Promise<void> {
-  const wakeUrl = env.workerWakeUrl;
+export async function wakeDeploymentWorkerAsync(config: Pick<typeof env, "workerWakeUrl" | "workerWakeSecret"> = env): Promise<void> {
+  if (process.env.GITHUB_RUNNER_REPOSITORY && process.env.GITHUB_RUNNER_INSTALLATION_ID) {
+    const token = await installationToken(process.env.GITHUB_RUNNER_INSTALLATION_ID);
+    await githubRequest(`/repos/${process.env.GITHUB_RUNNER_REPOSITORY}/actions/workflows/builds.yml/dispatches`, token, { method: "POST", body: JSON.stringify({ ref: process.env.GITHUB_RUNNER_REF ?? "main" }) });
+    return;
+  }
+  const wakeUrl = config.workerWakeUrl;
 
   if (!wakeUrl) {
     logger.info("WORKER_WAKE_URL is not set; deployment worker will not be notified");
@@ -60,7 +66,7 @@ export async function wakeDeploymentWorkerAsync(): Promise<void> {
     try {
       const response = await fetch(wakeUrl, {
         method: "POST",
-        headers: await buildWakeHeaders(wakeUrl),
+        headers: await buildWakeHeaders(wakeUrl, config.workerWakeSecret),
         signal: AbortSignal.timeout(WAKE_REQUEST_TIMEOUT_MS),
       });
 

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "deploy-grid-sites",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "secrets": { "required": ["ROUTING_SECRET"] },
+  "r2_buckets": [{ "binding": "ARTIFACTS", "bucket_name": "deploy-grid-artifacts" }],
+  "services": [{ "binding": "API", "service": "deploy-grid-api" }],
+  "vars": { "SITES_DOMAIN": "sites.example.com" },
+  "observability": { "enabled": true, "traces": { "enabled": true } }
+}

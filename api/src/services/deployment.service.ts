@@ -1,3 +1,4 @@
+import { PlatformRepository, type DeploymentOptions } from "../repositories/platform.repository.ts";
 import { Deployment } from "../domain/deployment.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../infrastructure/logger.ts";
@@ -5,7 +6,7 @@ import { BuildJobRepository } from "../repositories/build-job.repository.ts";
 import { DeploymentLogRepository } from "../repositories/deployment-log.repository.ts";
 import type { DeploymentRepository } from "../repositories/deployment.repository.ts";
 import { ProjectRepository } from "../repositories/project.repository.ts";
-import { wakeDeploymentWorker } from "../infrastructure/worker-wake.ts";
+import { wakeDeploymentWorkerAsync } from "../infrastructure/worker-wake.ts";
 import { DeploymentQueue } from "../queues/deployment.queue.ts";
 import { deriveProjectMetadata } from "../utils/project.ts";
 import type { Project } from "../db/schema.ts";
@@ -38,6 +39,7 @@ export class DeploymentService {
     private readonly buildJobRepo: BuildJobRepository,
     private readonly deploymentLogRepo: DeploymentLogRepository,
     private readonly deploymentQueue: DeploymentQueue,
+    private readonly platform: Pick<PlatformRepository, "createQueued"> = new PlatformRepository(),
   ) {}
 
   async createDeployment(
@@ -71,6 +73,7 @@ export class DeploymentService {
     projectId: string,
     clerkUserId: string,
     gitRef?: string,
+    options: DeploymentOptions = {},
   ): Promise<Deployment> {
     const project = await this.projectRepo.findById(projectId, clerkUserId);
 
@@ -78,12 +81,13 @@ export class DeploymentService {
       throw new DeploymentProjectNotFoundError(projectId);
     }
 
-    return this.createDeploymentForProjectRecord(project, gitRef);
+    return this.createDeploymentForProjectRecord(project, gitRef, options);
   }
 
   private async createDeploymentForProjectRecord(
     project: Project,
     gitRef?: string,
+    options: DeploymentOptions = {},
   ): Promise<Deployment> {
     const normalizedGitRef = gitRef?.trim() || project.defaultBranch;
     const deployment = Deployment.create({
@@ -92,12 +96,13 @@ export class DeploymentService {
       gitRef: normalizedGitRef,
     });
 
-    if (env.deploymentPreviewBaseUrl) {
+    if (process.env.SITES_DOMAIN) {
+      deployment.previewUrl = `https://d-${deployment.id}.${process.env.SITES_DOMAIN}`;
+    } else if (env.deploymentPreviewBaseUrl) {
       deployment.previewUrl = `${env.deploymentPreviewBaseUrl}/${deployment.id}`;
     }
 
-    await this.repo.create(deployment);
-    const buildJob = await this.buildJobRepo.create(deployment.id);
+    const buildJob = await this.platform.createQueued(deployment, project, options);
 
     try {
       await this.deploymentQueue.enqueue({
@@ -112,15 +117,13 @@ export class DeploymentService {
         outputDirectory: project.outputDirectory,
       });
 
-      wakeDeploymentWorker();
+      await wakeDeploymentWorkerAsync();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to enqueue build job";
 
-      deployment.markFailed(errorMessage);
-      await this.repo.update(deployment);
-      await this.buildJobRepo.markFailed(buildJob.id, errorMessage);
-
+      // The transaction is the durable outbox. Recovery re-enqueues queued jobs
+      // if Redis or runner dispatch fails; do not lose the deployment here.
       logger.error("Failed to enqueue deployment job", {
         deploymentId: deployment.id,
         buildJobId: buildJob.id,

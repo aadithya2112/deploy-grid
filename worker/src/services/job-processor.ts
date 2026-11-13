@@ -1,4 +1,6 @@
 import path from "node:path";
+import { installationToken } from "../../../shared/github.ts";
+import { detectFramework } from "../build/framework.ts";
 import { env } from "../config/env.ts";
 import type { DeploymentJobMessage } from "../contracts/deployment-job.ts";
 import type { BuildJob, Deployment, Project, ProjectEnvVar } from "../db/schema.ts";
@@ -48,6 +50,10 @@ interface ProcessorDependencies {
       commitSha: string;
       artifactUrl: string;
       now: Date;
+      artifactPrefix?: string;
+      framework?: string;
+      routing?: "spa" | "static";
+      metrics?: Record<string, number>;
     }): Promise<void>;
     finalizeFailure(input: {
       deploymentId: string;
@@ -63,6 +69,7 @@ interface ProcessorDependencies {
     input: CheckoutRepositoryInput,
   ) => Promise<CheckoutRepositoryResult>;
   now?: () => Date;
+  onStatus?: (deploymentId: string, status: "pending" | "success" | "failure") => Promise<void>;
 }
 
 function getResolvedProjectSetting(
@@ -174,6 +181,11 @@ export class JobProcessor {
       state.deployment.id,
     );
 
+    const cancellation = new AbortController();
+    const started = performance.now();
+    const metrics: Record<string, number> = {};
+    const artifactId = `${state.deployment.id}/${crypto.randomUUID()}`;
+    let secrets: string[] = [];
     let workspaceDir: string | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let claimReleased = false;
@@ -193,6 +205,7 @@ export class JobProcessor {
           .refreshLease(claimedJob.id, env.workerId, nextLeaseUntil, heartbeatNow)
           .then((refreshed) => {
             if (!refreshed) {
+              cancellation.abort();
               logger.warn("Failed to refresh build job lease", {
                 buildJobId: claimedJob.id,
                 deploymentId: state.deployment.id,
@@ -200,6 +213,7 @@ export class JobProcessor {
             }
           })
           .catch((error) => {
+            cancellation.abort();
             logger.warn("Lease refresh errored", {
               buildJobId: claimedJob.id,
               deploymentId: state.deployment.id,
@@ -210,13 +224,17 @@ export class JobProcessor {
 
       await logWriter.system("clone started");
 
+      const settings = state.deployment.settings ?? state.project;
+      const gitToken = state.deployment.githubInstallationId ? await installationToken(state.deployment.githubInstallationId) : undefined;
+      if (gitToken) logWriter.setSecretsToRedact([gitToken]);
       const checkout = await this.dependencies.checkoutRepository({
+        gitToken,
         deploymentId: state.deployment.id,
         repoUrl: state.project.repoUrl || message.repoUrl,
         gitRef: state.deployment.gitRef || message.gitRef,
         tmpBaseDir: env.workerTmpDir,
         rootDirectory: getResolvedProjectSetting(
-          state.project.rootDirectory,
+          settings.rootDirectory,
           message.rootDirectory,
         ),
         commandRunner: this.dependencies.commandRunner,
@@ -232,24 +250,29 @@ export class JobProcessor {
         this.dependencies.now?.() ?? new Date(),
       );
 
+      await this.dependencies.onStatus?.(state.deployment.id, "pending");
       await logWriter.system("clone completed");
       await logWriter.system(`resolved commit ${checkout.commitSha}`);
 
-      const buildEnv = await resolveBuildEnvironment(state.projectEnvVars, "preview");
+      metrics.cloneMs = performance.now() - started;
+      const buildEnv = await resolveBuildEnvironment(state.projectEnvVars, state.deployment.environment ?? "preview");
       const redactionValues = Object.values(buildEnv).filter(Boolean);
+      secrets = redactionValues;
       logWriter.setSecretsToRedact(redactionValues);
 
+      const framework = await detectFramework(checkout.buildDir);
+      await logWriter.system(`framework=${framework.framework} routing=${framework.routing}`);
       const buildCommands = await resolveBuildCommands(checkout.buildDir, {
         installCommand: getResolvedProjectSetting(
-          state.project.installCommand,
+          settings.installCommand,
           message.installCommand,
         ),
         buildCommand: getResolvedProjectSetting(
-          state.project.buildCommand,
+          settings.buildCommand,
           message.buildCommand,
         ),
         outputDirectory: getResolvedProjectSetting(
-          state.project.outputDirectory,
+          settings.outputDirectory,
           message.outputDirectory,
         ),
       });
@@ -259,11 +282,15 @@ export class JobProcessor {
       );
       await logWriter.system(`selected build command=${buildCommands.buildCommand}`);
       await logWriter.system("dependencies install started");
+      const installStarted = performance.now();
 
       await runCommandWithRetry(this.dependencies.commandRunner, {
         command: buildCommands.installCommand,
         cwd: checkout.buildDir,
         env: buildEnv,
+        workspaceDir: checkout.workspaceDir,
+        signal: cancellation.signal,
+        cacheKey: state.project.id,
         timeoutMs: env.buildTimeoutSeconds * 1_000,
         retryLimit: env.transientCommandRetryLimit,
         retryDelayMs: env.transientCommandRetryDelayMs,
@@ -275,13 +302,18 @@ export class JobProcessor {
         onStderr: (line) => logWriter.stderr(line),
       });
 
+      metrics.installMs = performance.now() - installStarted;
       await logWriter.system("dependencies install completed");
+      const buildStarted = performance.now();
       await logWriter.system("build started");
 
       await runCommandWithRetry(this.dependencies.commandRunner, {
         command: buildCommands.buildCommand,
         cwd: checkout.buildDir,
         env: buildEnv,
+        workspaceDir: checkout.workspaceDir,
+        signal: cancellation.signal,
+        cacheKey: state.project.id,
         timeoutMs: env.buildTimeoutSeconds * 1_000,
         retryLimit: env.transientCommandRetryLimit,
         retryDelayMs: env.transientCommandRetryDelayMs,
@@ -293,19 +325,21 @@ export class JobProcessor {
         onStderr: (line) => logWriter.stderr(line),
       });
 
+      metrics.buildMs = performance.now() - buildStarted;
       await logWriter.system("build completed");
 
       const artifactDirectory = await resolveArtifactDirectory(
         checkout.buildDir,
-        buildCommands.outputDirectory,
+        buildCommands.outputDirectory ?? (framework.framework === "static" ? null : framework.outputDirectory),
       );
 
       await logWriter.system(`artifact upload started from ${path.basename(artifactDirectory)}`);
 
       const artifactUrl = await uploadArtifactDirectory(
         this.dependencies.artifactStorage,
-        state.deployment.id,
+        artifactId,
         artifactDirectory,
+        framework,
       );
 
       await logWriter.system("artifact upload completed");
@@ -316,14 +350,20 @@ export class JobProcessor {
         buildJobId: claimedJob.id,
         claimedBy: env.workerId,
         commitSha: checkout.commitSha,
-        artifactUrl,
+        artifactUrl: state.deployment.previewUrl ?? artifactUrl,
+        artifactPrefix: `deployments/${artifactId}`,
+        framework: framework.framework,
+        routing: framework.routing,
+        metrics: { ...metrics, totalMs: performance.now() - started },
         now: finishedAt,
       });
 
+      await this.dependencies.onStatus?.(state.deployment.id, "success");
       await logWriter.system("deployment marked ready");
       claimReleased = true;
     } catch (error: unknown) {
-      const errorMessage = sanitizeErrorMessage(error);
+      let errorMessage = sanitizeErrorMessage(error);
+      for (const secret of secrets) errorMessage = errorMessage.split(secret).join("[REDACTED]");
 
       await this.dependencies.workerStateRepository.finalizeFailure({
         deploymentId: state.deployment.id,
@@ -333,6 +373,7 @@ export class JobProcessor {
         now: this.dependencies.now?.() ?? new Date(),
       });
 
+      await this.dependencies.onStatus?.(state.deployment.id, "failure");
       try {
         await logWriter.system(`deployment marked failed: ${errorMessage}`);
       } catch (logError) {

@@ -16,7 +16,7 @@ export class WorkerService {
 
     let processed = 0;
 
-    while (true) {
+    while (processed < 20) {
       const message = await this.queue.pop();
 
       if (!message) {
@@ -25,7 +25,7 @@ export class WorkerService {
 
       try {
         await this.jobProcessor.process(message);
-        processed += 1;
+
       } catch (error) {
         logger.error("Deployment job processing failed", {
           buildJobId: message.buildJobId,
@@ -33,6 +33,7 @@ export class WorkerService {
           error: error instanceof Error ? error.message : "Unknown job error",
         });
       }
+      processed += 1;
     }
 
     logger.info("Queue drained", {
