@@ -64,24 +64,24 @@ async function cleanupProjectsByRepoUrl(repoUrls: string[]): Promise<void> {
     await db
       .delete(deploymentLogs)
       .where(inArray(deploymentLogs.deploymentId, deploymentIds));
-    await db.delete(buildJobs).where(inArray(buildJobs.deploymentId, deploymentIds));
+    await db
+      .delete(buildJobs)
+      .where(inArray(buildJobs.deploymentId, deploymentIds));
     await db.delete(deployments).where(inArray(deployments.id, deploymentIds));
   }
 
-  await db.delete(projectEnvVars).where(inArray(projectEnvVars.projectId, projectIds));
+  await db
+    .delete(projectEnvVars)
+    .where(inArray(projectEnvVars.projectId, projectIds));
   await db.delete(projects).where(inArray(projects.id, projectIds));
 }
 
 describe("repository integration tests", () => {
-  afterAll(async () => {
-    await sql.end();
-  });
-
   test(
     "ProjectRepository creates or reuses projects by repoUrl for the same user",
     async () => {
-    const repoUrl = createRepoUrl("project");
-    const clerkUserId = createClerkUserId("project");
+      const repoUrl = createRepoUrl("project");
+      const clerkUserId = createClerkUserId("project");
       try {
         const first = await projectRepository.createOrGet({
           clerkUserId,
@@ -107,7 +107,10 @@ describe("repository integration tests", () => {
           outputDirectory: null,
         });
 
-        const loaded = await projectRepository.findByRepoUrl(repoUrl, clerkUserId);
+        const loaded = await projectRepository.findByRepoUrl(
+          repoUrl,
+          clerkUserId,
+        );
 
         expect(second.id).toBe(first.id);
         expect(loaded?.id).toBe(first.id);
@@ -151,8 +154,14 @@ describe("repository integration tests", () => {
           outputDirectory: null,
         });
 
-        const firstLoaded = await projectRepository.findByRepoUrl(repoUrl, firstUserId);
-        const secondLoaded = await projectRepository.findByRepoUrl(repoUrl, secondUserId);
+        const firstLoaded = await projectRepository.findByRepoUrl(
+          repoUrl,
+          firstUserId,
+        );
+        const secondLoaded = await projectRepository.findByRepoUrl(
+          repoUrl,
+          secondUserId,
+        );
 
         expect(first.id).not.toBe(second.id);
         expect(firstLoaded).toMatchObject({
@@ -173,8 +182,8 @@ describe("repository integration tests", () => {
   test(
     "DeploymentRepository creates, updates, and loads deployments with repoUrl",
     async () => {
-    const repoUrl = createRepoUrl("deployment");
-    const clerkUserId = createClerkUserId("deployment");
+      const repoUrl = createRepoUrl("deployment");
+      const clerkUserId = createClerkUserId("deployment");
       try {
         const project = await projectRepository.createOrGet({
           clerkUserId,
@@ -228,8 +237,8 @@ describe("repository integration tests", () => {
   test(
     "BuildJobRepository creates jobs and marks them as failed",
     async () => {
-    const repoUrl = createRepoUrl("build-job");
-    const clerkUserId = createClerkUserId("build-job");
+      const repoUrl = createRepoUrl("build-job");
+      const clerkUserId = createClerkUserId("build-job");
       try {
         const project = await projectRepository.createOrGet({
           clerkUserId,
@@ -313,21 +322,26 @@ describe("repository integration tests", () => {
           limit: 50,
           offset: 0,
         });
-        const loaded = await projectRepository.findById(project.id, clerkUserId);
+        const loaded = await projectRepository.findById(
+          project.id,
+          clerkUserId,
+        );
         const updated = await projectRepository.updateSettings(
           project.id,
           clerkUserId,
           {
-          defaultBranch: "develop",
-          buildCommand: "bun run build",
+            defaultBranch: "develop",
+            buildCommand: "bun run build",
           },
         );
 
-        expect(listedProjects.some((entry) => entry.id === project.id)).toBe(true);
-        expect(loaded?.id).toBe(project.id);
-        expect(listedProjects.every((entry) => entry.clerkUserId === clerkUserId)).toBe(
+        expect(listedProjects.some((entry) => entry.id === project.id)).toBe(
           true,
         );
+        expect(loaded?.id).toBe(project.id);
+        expect(
+          listedProjects.every((entry) => entry.clerkUserId === clerkUserId),
+        ).toBe(true);
         expect(updated?.defaultBranch).toBe("develop");
         expect(updated?.buildCommand).toBe("bun run build");
       } finally {
@@ -369,15 +383,22 @@ describe("repository integration tests", () => {
         await deploymentRepository.create(first);
         await deploymentRepository.create(second);
 
-        const deploymentsForProject = await deploymentRepository.listByProjectId(
+        const deploymentsForProject =
+          await deploymentRepository.listByProjectId(project.id, {
+            limit: 10,
+            offset: 0,
+          });
+        const latest = await deploymentRepository.findLatestByProjectId(
           project.id,
-          { limit: 10, offset: 0 },
         );
-        const latest = await deploymentRepository.findLatestByProjectId(project.id);
 
         expect(deploymentsForProject.length).toBe(2);
-        expect(deploymentsForProject.some((item) => item.id === first.id)).toBe(true);
-        expect(deploymentsForProject.some((item) => item.id === second.id)).toBe(true);
+        expect(deploymentsForProject.some((item) => item.id === first.id)).toBe(
+          true,
+        );
+        expect(
+          deploymentsForProject.some((item) => item.id === second.id),
+        ).toBe(true);
         expect(latest?.projectId).toBe(project.id);
       } finally {
         await cleanupProjectsByRepoUrl([repoUrl]);
@@ -474,11 +495,12 @@ describe("repository integration tests", () => {
           target: "preview",
         });
 
-        const envVars = await projectEnvVarRepository.listByProjectId(project.id);
-        await projectEnvVarRepository.delete(project.id, "API_KEY", "preview");
-        const envVarsAfterDelete = await projectEnvVarRepository.listByProjectId(
+        const envVars = await projectEnvVarRepository.listByProjectId(
           project.id,
         );
+        await projectEnvVarRepository.delete(project.id, "API_KEY", "preview");
+        const envVarsAfterDelete =
+          await projectEnvVarRepository.listByProjectId(project.id);
 
         expect(second.id).toBe(first.id);
         expect(envVars).toHaveLength(1);

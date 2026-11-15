@@ -40,6 +40,15 @@ export default async function DeploymentDetailPage({
 
   return (
     <PageShell
+      section="deployment"
+      project={{
+        id,
+        name:
+          deployment.repoUrl
+            .replace(/\.git$/, "")
+            .split("/")
+            .at(-1) ?? "Project",
+      }}
       title={`Deployment ${deployment.id.slice(0, 8)}`}
       description={`${deployment.repoUrl} • ${deployment.gitRef}`}
       actions={

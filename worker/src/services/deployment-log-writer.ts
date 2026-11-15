@@ -30,6 +30,7 @@ function normalizeMessage(message: string): string {
 
 export class DeploymentLogWriter {
   private nextSequence = 1;
+  private bytes = 0;
   private writeChain: Promise<void>;
 
   constructor(
@@ -45,6 +46,8 @@ export class DeploymentLogWriter {
   }
 
   private async append(stream: LogStream, message: string): Promise<void> {
+    this.bytes += message.length;
+    if (this.bytes > 1_000_000 || this.nextSequence > 5000) return;
     this.writeChain = this.writeChain.then(async () => {
       await this.repository.append({
         deploymentId: this.deploymentId,

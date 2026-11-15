@@ -1,5 +1,5 @@
 import { screen } from "@testing-library/react"
-import { beforeEach, describe, expect, test, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 
 import {
   notFoundMock,
@@ -52,6 +52,7 @@ import ProjectDetailPage from "./page"
 
 describe("ProjectDetailPage", () => {
   beforeEach(() => {
+    vi.stubEnv("STATIC_PLATFORM_ENABLED", undefined)
     resetNavigationMocks()
     getAuthMock.mockReset()
     getProjectMock.mockReset()
@@ -99,6 +100,8 @@ describe("ProjectDetailPage", () => {
     })
   })
 
+  afterEach(() => vi.unstubAllEnvs())
+
   test("redirects signed-out users to sign-in", async () => {
     getAuthMock.mockResolvedValueOnce({ userId: null })
 
@@ -117,6 +120,19 @@ describe("ProjectDetailPage", () => {
       screen.getByRole("button", { name: /redeploy latest/i })
     ).toBeInTheDocument()
     expect(screen.getByText("Recent deployments")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("link", { name: "Manage releases" })
+    ).not.toBeInTheDocument()
+  })
+
+  test("exposes release management only after explicit backend activation", async () => {
+    vi.stubEnv("STATIC_PLATFORM_ENABLED", "true")
+    await renderServerComponent(
+      ProjectDetailPage({ params: Promise.resolve({ id: "project-123" }) })
+    )
+    expect(
+      screen.getByRole("link", { name: "Manage releases" })
+    ).toHaveAttribute("href", "/projects/project-123/manage")
   })
 
   test("shows a deploy CTA when the project has no deployments", async () => {
@@ -130,6 +146,8 @@ describe("ProjectDetailPage", () => {
       ProjectDetailPage({ params: Promise.resolve({ id: "project-123" }) })
     )
 
-    expect(screen.getAllByRole("button", { name: /deploy now/i }).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByRole("button", { name: /deploy now/i }).length
+    ).toBeGreaterThan(0)
   })
 })

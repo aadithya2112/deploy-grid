@@ -1,0 +1,13 @@
+.DS_Store
+**/node_modules/
+**/.env
+**/.env.local
+**/.dev.vars
+**/.wrangler/
+**/.tmp/
+**/.next/
+**/test-results/
+**/playwright-report/
+**/dist/
+**/*.tsbuildinfo
+

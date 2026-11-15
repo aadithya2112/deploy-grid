@@ -8,7 +8,11 @@
     "start": "bun run index.ts",
     "smoke": "bun run ./scripts/smoke.ts",
     "test": "bun test --preload ./test/setup.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start:once": "bun index.ts --once",
+    "test:frameworks": "bun scripts/framework-smoke.ts",
+    "test:isolation": "bun scripts/isolation-smoke.ts",
+    "test:lifecycle": "bun scripts/lifecycle-smoke.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

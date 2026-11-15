@@ -1,7 +1,7 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, stat, realpath } from "node:fs/promises";
 import path from "node:path";
 
-const defaultOutputDirectories = ["dist", "build"];
+const defaultOutputDirectories = ["dist", "build", "out"];
 
 async function directoryExists(directoryPath: string): Promise<boolean> {
   try {
@@ -50,12 +50,21 @@ export async function resolveArtifactDirectory(
 
   const candidates = configuredCandidate
     ? [configuredCandidate]
-    : defaultOutputDirectories.map((candidate) => path.join(buildDir, candidate));
+    : defaultOutputDirectories.map((candidate) =>
+        path.join(buildDir, candidate),
+      );
 
   for (const candidate of candidates) {
     if (!(await directoryExists(candidate))) {
       continue;
     }
+
+    const resolved = await realpath(candidate);
+    const root = await realpath(buildDir);
+    if (!resolved.startsWith(`${root}${path.sep}`))
+      throw new Error(
+        "Artifact directory must be inside the project, not its root or an external symlink",
+      );
 
     if (!(await directoryHasFiles(candidate))) {
       continue;

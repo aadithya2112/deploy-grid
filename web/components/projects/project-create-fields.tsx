@@ -17,14 +17,14 @@ export function ProjectCreateFields() {
       <div className="grid gap-1.5">
         <Label htmlFor="repoUrl">GitHub URL</Label>
         <div className="relative">
-          <Github className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Github className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="repoUrl"
             name="repoUrl"
             type="url"
             placeholder="https://github.com/owner/repo.git"
             required
-            className="h-11 rounded-xl pl-10"
+            className="h-11 rounded-md pl-10"
           />
         </div>
       </div>
@@ -32,18 +32,19 @@ export function ProjectCreateFields() {
       <Accordion
         type="single"
         collapsible
-        className="rounded-[20px] border border-border/70 bg-muted/[0.35] px-4"
+        className="rounded-md border border-border/70 bg-muted/[0.35] px-4"
       >
         <AccordionItem value="advanced" className="border-none">
           <AccordionTrigger className="py-4 text-sm hover:no-underline">
             <div className="flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-2xl border border-border/70 bg-background/80">
+              <div className="flex size-8 items-center justify-center rounded-md border border-border/70 bg-background/80">
                 <Settings2 className="size-4 text-muted-foreground" />
               </div>
               <div>
                 <p className="font-medium text-foreground">Advanced settings</p>
                 <p className="text-xs text-muted-foreground">
-                  Override build defaults only when the repo needs custom paths or commands.
+                  Override build defaults only when the repo needs custom paths
+                  or commands.
                 </p>
               </div>
             </div>
@@ -56,7 +57,7 @@ export function ProjectCreateFields() {
                   id="name"
                   name="name"
                   placeholder="my-app"
-                  className="h-10 rounded-xl bg-background"
+                  className="h-10 rounded-md bg-background"
                 />
               </div>
               <div className="grid gap-1.5">
@@ -65,7 +66,7 @@ export function ProjectCreateFields() {
                   id="defaultBranch"
                   name="defaultBranch"
                   placeholder="main"
-                  className="h-10 rounded-xl bg-background"
+                  className="h-10 rounded-md bg-background"
                 />
               </div>
               <div className="grid gap-1.5">
@@ -74,7 +75,7 @@ export function ProjectCreateFields() {
                   id="rootDirectory"
                   name="rootDirectory"
                   placeholder="apps/web"
-                  className="h-10 rounded-xl bg-background"
+                  className="h-10 rounded-md bg-background"
                 />
               </div>
               <div className="grid gap-1.5">
@@ -83,7 +84,7 @@ export function ProjectCreateFields() {
                   id="outputDirectory"
                   name="outputDirectory"
                   placeholder="dist"
-                  className="h-10 rounded-xl bg-background"
+                  className="h-10 rounded-md bg-background"
                 />
               </div>
               <div className="grid gap-1.5">
@@ -92,7 +93,7 @@ export function ProjectCreateFields() {
                   id="installCommand"
                   name="installCommand"
                   placeholder="bun install"
-                  className="h-10 rounded-xl bg-background"
+                  className="h-10 rounded-md bg-background"
                 />
               </div>
               <div className="grid gap-1.5">
@@ -101,7 +102,7 @@ export function ProjectCreateFields() {
                   id="buildCommand"
                   name="buildCommand"
                   placeholder="bun run build"
-                  className="h-10 rounded-xl bg-background"
+                  className="h-10 rounded-md bg-background"
                 />
               </div>
             </div>

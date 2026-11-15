@@ -3,55 +3,20 @@ import { redirect } from "next/navigation"
 import {
   ArrowRight,
   FolderGit2,
+  GitBranch,
   Plus,
+  RefreshCcw,
   Search,
-  Server,
-  ShieldCheck,
 } from "lucide-react"
-import { UserButton } from "@clerk/nextjs"
 
-import { ApiHealthCard } from "@/components/dashboard/api-health-card"
-import { DeploymentStatusBadge } from "@/components/deployments/status-badge"
 import { PageShell } from "@/components/layout/page-shell"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { getAuth } from "@/lib/auth"
 import { listProjects } from "@/lib/api"
-import { isE2ETestMode } from "@/lib/test-mode"
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString()
-}
 
 function normalizeQuery(input: string | string[] | undefined) {
-  if (typeof input !== "string") {
-    return ""
-  }
-
-  return input.trim()
+  return typeof input === "string" ? input.trim() : ""
 }
 
 const emptyProjects = {
@@ -65,243 +30,176 @@ export default async function DashboardPage({
   searchParams?: Promise<{ query?: string | string[] }>
 }) {
   const { userId } = await getAuth()
-
-  if (!userId) {
-    redirect("/sign-in")
-  }
+  if (!userId) redirect("/sign-in")
 
   const params = searchParams ? await searchParams : undefined
   const query = normalizeQuery(params?.query)
-
   const { projectError, projects } = await listProjects(userId, {
     limit: 20,
     query: query || undefined,
   })
-    .then((projects) => ({
-      projectError: null,
-      projects,
-    }))
+    .then((projects) => ({ projectError: null, projects }))
     .catch((error) => ({
-      projectError: error instanceof Error ? error.message : "Failed to load projects",
+      projectError:
+        error instanceof Error ? error.message : "Failed to load projects",
       projects: emptyProjects,
     }))
-
   const sortedProjects = [...projects.projects].sort(
     (left, right) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
   )
-  const hasProjects = sortedProjects.length > 0
-  const hasQuery = query.length > 0
 
   return (
     <PageShell
       title="Projects"
-      description="Manage repositories, open active deployments, and jump back into build history."
+      description="Your repositories, deployments, and build history."
       actions={
         <>
-          <Button asChild size="sm">
-            <Link href="/projects/new">
-              <Plus className="size-3.5" />
-              New Project
+          <Button asChild size="sm" variant="ghost">
+            <Link href="/dashboard">
+              <RefreshCcw className="size-3.5" /> Refresh
             </Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard">Refresh</Link>
+          <Button asChild size="sm">
+            <Link href="/projects/new">
+              <Plus className="size-3.5" /> New Project
+            </Link>
           </Button>
-          {isE2ETestMode() ? null : <UserButton />}
         </>
       }
     >
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
-        <div className="overflow-hidden rounded-[24px] border border-border/70 bg-background animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="border-b border-border/70 px-5 py-5 md:px-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                  Workspace
-                </p>
-                <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
-                  Your projects
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Showing up to {projects.pageInfo.limit} repositories for this signed-in user.
-                </p>
-              </div>
-              <form action="/dashboard" className="flex w-full max-w-md items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    name="query"
-                    defaultValue={query}
-                    placeholder="Search by project name or repo URL"
-                    className="h-10 rounded-full pl-10"
-                  />
-                </div>
-                <Button type="submit" variant="outline" className="rounded-full">
-                  Search
-                </Button>
-                {hasQuery ? (
-                  <Button asChild variant="ghost" className="rounded-full">
-                    <Link href="/dashboard">Clear</Link>
-                  </Button>
-                ) : null}
-              </form>
-            </div>
-          </div>
-
-          <div className="px-5 py-5 md:px-6">
-            {projectError ? (
-              <p className="text-sm text-destructive">{projectError}</p>
-            ) : hasProjects ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedProjects.map((project) => (
-                    <TableRow
-                      key={project.id}
-                      className="group transition-colors hover:bg-muted/30"
-                    >
-                      <TableCell>
-                        <div className="font-medium text-foreground">
-                          {project.name}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {project.repoUrl}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className="rounded-full font-mono text-[11px]"
-                        >
-                          {project.defaultBranch}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(project.updatedAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="outline"
-                          className="rounded-full"
-                        >
-                          <Link href={`/projects/${project.id}`}>
-                            Open
-                            <ArrowRight className="size-3.5" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <Empty className="rounded-[24px] border border-dashed border-border/80 bg-muted/[0.25] px-6 py-10 text-left">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    {hasQuery ? (
-                      <Search className="size-4" />
-                    ) : (
-                      <FolderGit2 className="size-4" />
-                    )}
-                  </EmptyMedia>
-                  <EmptyTitle>
-                    {hasQuery ? "No matching projects" : "No projects yet"}
-                  </EmptyTitle>
-                  <EmptyDescription>
-                    {hasQuery
-                      ? "Try another search term or clear the filter to see all projects."
-                      : "Start by connecting a repository. Creating a project also starts the first deployment and sends you straight to the logs."}
-                  </EmptyDescription>
-                </EmptyHeader>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {hasQuery ? (
-                    <Button asChild variant="outline" className="rounded-full">
-                      <Link href="/dashboard">Clear search</Link>
-                    </Button>
-                  ) : null}
-                  <Button asChild className="rounded-full">
-                    <Link href="/projects/new">
-                      <Plus className="size-4" />
-                      New Project
-                    </Link>
-                  </Button>
-                </div>
-              </Empty>
-            )}
-          </div>
+      <section aria-labelledby="projects-heading">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="projects-heading" className="text-sm font-medium">
+            Your projects
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {sortedProjects.length}{" "}
+            {sortedProjects.length === 1 ? "project" : "projects"}
+            {query ? " found" : ""}
+          </span>
         </div>
-
-        <div className="grid gap-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
-          <div className="rounded-[24px] border border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] px-5 py-5 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.9),rgba(15,23,42,0.86))]">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-              Summary
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Visible projects
-                </p>
-                <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                  {sortedProjects.length}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Primary flow
-                </p>
-                <p className="mt-2 text-sm font-medium text-foreground">
-                  Project → deployment → logs
-                </p>
-              </div>
-            </div>
+        <form
+          action="/dashboard"
+          className="flex flex-wrap items-center gap-2 border-b border-border pb-3"
+        >
+          <label htmlFor="project-search" className="sr-only">
+            Find a project
+          </label>
+          <div className="relative min-w-0 flex-1">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-0 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              id="project-search"
+              type="search"
+              name="query"
+              defaultValue={query}
+              placeholder="Find a project or repository…"
+              className="h-10 border-0 bg-transparent pl-7 shadow-none focus-visible:ring-2 dark:bg-transparent"
+            />
           </div>
+          <Button type="submit" variant="ghost" size="sm">
+            Search
+          </Button>
+          {query ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard">Clear</Link>
+            </Button>
+          ) : null}
+        </form>
 
-          <ApiHealthCard />
-
-          <Card className="rounded-[24px] border-border/70 shadow-none">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="size-4" />
-                Deployment states
-              </CardTitle>
-              <CardDescription>
-                The same status badges appear across project and deployment views.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <DeploymentStatusBadge status="queued" />
-              <DeploymentStatusBadge status="building" />
-              <DeploymentStatusBadge status="ready" />
-              <DeploymentStatusBadge status="failed" />
-              <DeploymentStatusBadge status="cancelled" />
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[24px] border-border/70 shadow-none">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="size-4" />
-                Workspace model
-              </CardTitle>
-              <CardDescription>
-                This dashboard prioritizes existing projects before creation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>Use `New Project` when you want to connect another repository.</p>
-              <p>Opening a project takes you to deployments first, with env vars and settings underneath.</p>
-            </CardContent>
-          </Card>
+        {projectError ? (
+          <div role="alert" className="border-b border-border py-8">
+            <p className="text-sm text-destructive">{projectError}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Refresh to try loading your projects again.
+            </p>
+          </div>
+        ) : sortedProjects.length ? (
+          <ul className="divide-y divide-border">
+            {sortedProjects.map((project) => (
+              <li key={project.id}>
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="group grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-4 rounded-sm py-6 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring motion-reduce:transition-none sm:px-2"
+                  aria-label={`Open ${project.name}`}
+                >
+                  <span
+                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-muted/40 font-heading text-sm font-medium text-primary dark:text-chart-2"
+                    aria-hidden="true"
+                  >
+                    {project.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h3 className="text-sm font-medium group-hover:text-primary dark:group-hover:text-chart-2">
+                        {project.name}
+                      </h3>
+                      <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        <GitBranch className="size-3" aria-hidden="true" />
+                        {project.defaultBranch}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 truncate text-xs text-muted-foreground">
+                      {project.repoUrl
+                        .replace(/^https?:\/\/github\.com\//, "")
+                        .replace(/\.git$/, "")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <time
+                      dateTime={project.updatedAt}
+                      className="hidden text-right text-xs text-muted-foreground sm:block"
+                    >
+                      Updated{" "}
+                      {new Date(project.updatedAt).toLocaleDateString("en", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </time>
+                    <ArrowRight
+                      className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary motion-reduce:transform-none"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="flex flex-col items-center border-b border-border px-4 py-20 text-center">
+            <FolderGit2
+              className="mb-5 size-8 text-primary/70"
+              aria-hidden="true"
+            />
+            <h3 className="font-heading text-xl font-medium">
+              {query ? "No matching projects" : "No projects yet"}
+            </h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+              {query
+                ? "Try another project name or repository URL."
+                : "Connect a repository to start your first deployment."}
+            </p>
+            <Button
+              asChild
+              className="mt-6"
+              variant={query ? "outline" : "default"}
+            >
+              <Link href={query ? "/dashboard" : "/projects/new"}>
+                {query ? "Clear search" : "New Project"}
+              </Link>
+            </Button>
+          </div>
+        )}
+        <div className="mt-6 flex flex-wrap justify-between gap-3 text-xs text-muted-foreground">
+          <p>
+            {projects.pageInfo.hasMore
+              ? `Showing the latest ${projects.pageInfo.limit} projects.`
+              : "Sorted by most recently updated."}
+          </p>
+          <p>Open a project to view deployments and logs.</p>
         </div>
       </section>
     </PageShell>

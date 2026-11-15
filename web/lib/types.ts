@@ -86,3 +86,22 @@ export interface DeploymentLogsResponse {
   deploymentId: string
   logs: DeploymentLogEntry[]
 }
+
+export interface PlatformOverview {
+  release: {
+    deploymentId: string | null
+    installationId: string | null
+    repository: string | null
+  } | null
+  productionUrl: string | null
+  history: { deploymentId: string; actor: string; createdAt: string }[]
+  builds: {
+    id: string
+    environment: string
+    framework: string | null
+    metrics: Record<string, number>
+    pullRequest: number | null
+    expiresAt: string | null
+    deletedAt: string | null
+  }[]
+}

@@ -1,3 +1,4 @@
+import { installationToken, githubRequest } from "../../../shared/github.ts";
 import { env } from "../config/env.ts";
 import { logger } from "./logger.ts";
 
@@ -10,7 +11,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function getCloudRunIdentityToken(audience: string): Promise<string | null> {
+async function getCloudRunIdentityToken(
+  audience: string,
+): Promise<string | null> {
   const metadataUrl = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}&format=full`;
 
   try {
@@ -29,11 +32,14 @@ async function getCloudRunIdentityToken(audience: string): Promise<string | null
   }
 }
 
-async function buildWakeHeaders(wakeUrl: string): Promise<HeadersInit> {
+async function buildWakeHeaders(
+  wakeUrl: string,
+  secret: string | null,
+): Promise<HeadersInit> {
   const headers: Record<string, string> = {};
 
-  if (env.workerWakeSecret) {
-    headers[WORKER_WAKE_TOKEN_HEADER] = env.workerWakeSecret;
+  if (secret) {
+    headers[WORKER_WAKE_TOKEN_HEADER] = secret;
   }
 
   const audience = new URL(wakeUrl).origin;
@@ -46,11 +52,32 @@ async function buildWakeHeaders(wakeUrl: string): Promise<HeadersInit> {
   return headers;
 }
 
-export async function wakeDeploymentWorkerAsync(): Promise<void> {
-  const wakeUrl = env.workerWakeUrl;
+export async function wakeDeploymentWorkerAsync(
+  config: Pick<typeof env, "workerWakeUrl" | "workerWakeSecret"> = env,
+): Promise<void> {
+  if (
+    process.env.GITHUB_RUNNER_REPOSITORY &&
+    process.env.GITHUB_RUNNER_INSTALLATION_ID
+  ) {
+    const token = await installationToken(
+      process.env.GITHUB_RUNNER_INSTALLATION_ID,
+    );
+    await githubRequest(
+      `/repos/${process.env.GITHUB_RUNNER_REPOSITORY}/actions/workflows/builds.yml/dispatches`,
+      token,
+      {
+        method: "POST",
+        body: JSON.stringify({ ref: process.env.GITHUB_RUNNER_REF ?? "main" }),
+      },
+    );
+    return;
+  }
+  const wakeUrl = config.workerWakeUrl;
 
   if (!wakeUrl) {
-    logger.info("WORKER_WAKE_URL is not set; deployment worker will not be notified");
+    logger.info(
+      "WORKER_WAKE_URL is not set; deployment worker will not be notified",
+    );
     return;
   }
 
@@ -60,7 +87,7 @@ export async function wakeDeploymentWorkerAsync(): Promise<void> {
     try {
       const response = await fetch(wakeUrl, {
         method: "POST",
-        headers: await buildWakeHeaders(wakeUrl),
+        headers: await buildWakeHeaders(wakeUrl, config.workerWakeSecret),
         signal: AbortSignal.timeout(WAKE_REQUEST_TIMEOUT_MS),
       });
 
@@ -81,7 +108,8 @@ export async function wakeDeploymentWorkerAsync(): Promise<void> {
 
     logger.info("Deployment worker wake attempt failed", {
       attempt,
-      error: lastError instanceof Error ? lastError.message : "Unknown wake error",
+      error:
+        lastError instanceof Error ? lastError.message : "Unknown wake error",
     });
 
     if (attempt < WAKE_ATTEMPTS) {
@@ -91,7 +119,8 @@ export async function wakeDeploymentWorkerAsync(): Promise<void> {
 
   logger.error("Deployment worker wake failed after retries", {
     wakeUrl,
-    error: lastError instanceof Error ? lastError.message : "Unknown wake error",
+    error:
+      lastError instanceof Error ? lastError.message : "Unknown wake error",
   });
 }
 

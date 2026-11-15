@@ -3,21 +3,20 @@ import { authorizeRequest } from "./auth.ts";
 
 describe("authorizeRequest", () => {
   test("allows public health requests", () => {
-    const response = authorizeRequest(
-      new Request("http://localhost/health"),
-      { expectedToken: "secret-token" },
-    );
+    const response = authorizeRequest(new Request("http://localhost/health"), {
+      expectedToken: "secret-token",
+    });
 
     expect(response).toBeNull();
   });
 
-  test("allows requests when auth is disabled", () => {
+  test("fails closed when the authentication secret is missing", () => {
     const response = authorizeRequest(
       new Request("http://localhost/projects"),
       { expectedToken: null },
     );
 
-    expect(response).toBeNull();
+    expect(response?.status).toBe(503);
   });
 
   test("rejects requests with missing bearer tokens", async () => {
