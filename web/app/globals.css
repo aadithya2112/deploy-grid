@@ -127,3 +127,14 @@
     @apply font-sans;
     }
 }
+
+@keyframes workspace-enter {
+  from { transform: translateY(5px); }
+  to { transform: translateY(0); }
+}
+
+.workspace-enter { animation: workspace-enter 220ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-enter { animation: none; }
+}

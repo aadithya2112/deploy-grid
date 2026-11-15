@@ -57,6 +57,8 @@ export default async function ManageProject({
   const details = new Map(platform.builds.map((build) => [build.id, build]))
   return (
     <PageShell
+      section="releases"
+      project={{ id, name: project.name }}
       title={`${project.name} · Releases`}
       description="Publish static sites, manage previews, and restore a previous release."
       actions={

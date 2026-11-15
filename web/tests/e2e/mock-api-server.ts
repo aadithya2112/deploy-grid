@@ -176,8 +176,11 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && url.pathname === "/projects") {
+    const query = (url.searchParams.get("query") ?? "").toLowerCase()
     sendJson(response, 200, {
-      projects: Array.from(projects.values()),
+      projects: Array.from(projects.values()).filter((project) =>
+        `${project.name} ${project.repoUrl}`.toLowerCase().includes(query)
+      ),
       pageInfo: {
         limit: 20,
         offset: 0,

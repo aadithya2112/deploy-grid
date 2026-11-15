@@ -1,5 +1,54 @@
 import { expect, test } from "@playwright/test"
 
+test("workspace navigation, search and theme work on mobile and desktop", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "light" })
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto("/dashboard")
+    const navigation = page.getByRole("navigation", {
+      name: "Workspace navigation",
+    })
+    await expect(
+      navigation.getByRole("link", { name: "Projects", exact: true })
+    ).toHaveAttribute("aria-current", "page")
+    await page
+      .getByRole("searchbox", { name: "Find a project" })
+      .fill("Ready App")
+    await page.getByRole("button", { name: "Search", exact: true }).click()
+    await expect(page).toHaveURL(/query=Ready(?:\+|%20)App/)
+    const project = page.getByRole("link", {
+      name: "Open Ready App",
+      exact: true,
+    })
+    await expect(project).toBeVisible()
+    await expect(
+      page.getByRole("link", { name: "Open Managed App", exact: true })
+    ).toHaveCount(0)
+    await project.click()
+    await expect(
+      page.getByRole("heading", { name: "Recent deployments" })
+    ).toBeVisible()
+    await navigation
+      .getByRole("link", { name: "Configuration", exact: true })
+      .click()
+    await expect(page).toHaveURL(/#configuration$/)
+    await expect(
+      page.getByRole("heading", { name: "Build settings" })
+    ).toBeVisible()
+    const sizing = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+    }))
+    expect(sizing.content).toBeLessThanOrEqual(sizing.viewport)
+  }
+  await page.getByRole("button", { name: "Toggle color theme" }).click()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  await page.getByRole("button", { name: "Toggle color theme" }).click()
+  await expect(page.locator("html")).not.toHaveClass(/dark/)
+})
+
 test("dashboard opens new-project flow and redirects to deployment logs", async ({
   page,
 }) => {

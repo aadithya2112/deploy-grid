@@ -1,10 +1,7 @@
 import { screen } from "@testing-library/react"
 import { beforeEach, describe, expect, test, vi } from "vitest"
 
-import {
-  redirectMock,
-  resetNavigationMocks,
-} from "@/tests/support/navigation"
+import { redirectMock, resetNavigationMocks } from "@/tests/support/navigation"
 import { renderServerComponent } from "@/tests/support/server-component"
 
 const { getAuthMock } = vi.hoisted(() => ({
@@ -43,7 +40,9 @@ describe("NewProjectPage", () => {
   test("renders the dedicated create-and-deploy route", async () => {
     await renderServerComponent(NewProjectPage())
 
-    expect(screen.getByText("New Project")).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: "New Project", level: 1 })
+    ).toBeInTheDocument()
     expect(
       screen.getByRole("button", { name: /create and deploy/i })
     ).toBeInTheDocument()

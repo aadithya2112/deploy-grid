@@ -5,6 +5,11 @@ import { vi } from "vitest"
 
 vi.mock("server-only", () => ({}))
 
+// Page tests exercise their data flow without starting the sidebar health fetch.
+vi.mock("@/components/dashboard/api-health-card", () => ({
+  ApiHealthCard: () => null,
+}))
+
 vi.mock("next/link", () => ({
   default: ({
     href,

@@ -2,24 +2,10 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ExternalLink, FolderGit2, RefreshCcw } from "lucide-react"
+import { ExternalLink, RefreshCcw } from "lucide-react"
 
 import { DeploymentStatusBadge } from "@/components/deployments/status-badge"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import type { DeploymentLogEntry, DeploymentSnapshot } from "@/lib/types"
 
 interface DeploymentLiveViewProps {
@@ -72,7 +58,9 @@ export function DeploymentLiveView({
   const [deployment, setDeployment] = useState(initialDeployment)
   const [logs, setLogs] = useState(initialLogs)
   const [pollError, setPollError] = useState<string | null>(null)
-  const [lastUpdatedAt, setLastUpdatedAt] = useState(initialDeployment.updatedAt)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(
+    initialDeployment.updatedAt
+  )
 
   const shouldPoll =
     deployment.status === "queued" || deployment.status === "building"
@@ -110,7 +98,9 @@ export function DeploymentLiveView({
         }
 
         setPollError(
-          error instanceof Error ? error.message : "Failed to refresh deployment"
+          error instanceof Error
+            ? error.message
+            : "Failed to refresh deployment"
         )
       } finally {
         if (isActive) {
@@ -135,210 +125,156 @@ export function DeploymentLiveView({
   }, [deploymentId, intervalMs, projectId, shouldPoll])
 
   return (
-    <>
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <div className="space-y-4">
-          <div className="overflow-hidden rounded-[24px] border border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.9),rgba(15,23,42,0.86))]">
-            <div className="border-b border-border/70 px-5 py-5 md:px-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="rounded-full px-3">
-                  <FolderGit2 className="size-3" />
-                  Deployment
-                </Badge>
-                <DeploymentStatusBadge status={deployment.status} />
-                {shouldPoll ? (
-                  <Badge variant="outline" className="rounded-full px-3 text-muted-foreground">
-                    <RefreshCcw className="size-3 animate-spin" />
-                    Live polling
-                  </Badge>
-                ) : null}
-              </div>
-              <h2 className="mt-4 font-heading text-2xl font-semibold tracking-tight text-foreground">
-                {deployment.repoUrl}
-              </h2>
-              <p className="mt-2 font-mono text-xs text-muted-foreground">
-                Deployment ID {deployment.id}
+    <div className="grid min-w-0 gap-10 xl:grid-cols-[minmax(0,1fr)_260px] xl:gap-12">
+      <section className="min-w-0" aria-labelledby="build-output-heading">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <DeploymentStatusBadge status={deployment.status} />
+            <span className="font-mono text-xs text-muted-foreground">
+              {deployment.gitRef}
+            </span>
+          </div>
+          {shouldPoll ? (
+            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCcw
+                className="size-3 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />{" "}
+              Live updates
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Build complete
+            </span>
+          )}
+        </div>
+        {deployment.errorMessage ? (
+          <p
+            role="alert"
+            className="mb-5 rounded-md border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {deployment.errorMessage}
+          </p>
+        ) : null}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id="build-output-heading" className="text-sm font-medium">
+            Logs
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {logs.length} log lines
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-border bg-[#0f1115] text-zinc-100">
+          {shouldPoll ? (
+            <p className="border-b border-white/10 px-4 py-3 text-xs text-zinc-400">
+              Refreshing while this deployment is still running.
+            </p>
+          ) : null}
+          {pollError ? (
+            <p
+              role="alert"
+              className="border-b border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-300"
+            >
+              Live updates paused: {pollError}
+            </p>
+          ) : null}
+          {logs.length ? (
+            <div
+              className="max-h-[36rem] overflow-auto p-4 sm:p-5"
+              aria-label="Build log output"
+            >
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3 py-1.5 font-mono text-xs sm:grid-cols-[28px_55px_minmax(0,1fr)]"
+                >
+                  <span className="text-zinc-600 select-none">
+                    {log.sequence}
+                  </span>
+                  <span className="hidden text-[10px] text-zinc-500 uppercase sm:block">
+                    {log.stream}
+                  </span>
+                  <span className="leading-relaxed break-all whitespace-pre-wrap">
+                    {log.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="px-5 py-14">
+              <h3 className="text-sm font-medium">No logs yet</h3>
+              <p className="mt-2 text-xs leading-6 text-zinc-400">
+                Build output will appear here as the deployment progresses.
               </p>
             </div>
-
-            <div className="grid gap-3 px-5 py-5 text-sm md:grid-cols-2 md:px-6">
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Commit SHA
-                </p>
-                <p className="mt-2 font-mono text-xs text-foreground">
-                  {deployment.commitSha ?? "—"}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Git ref
-                </p>
-                <p className="mt-2 font-mono text-xs text-foreground">
-                  {deployment.gitRef}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Created
-                </p>
-                <p className="mt-2 font-medium text-foreground">
-                  {formatDate(deployment.createdAt)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Last update
-                </p>
-                <p className="mt-2 font-medium text-foreground">
-                  {formatDate(lastUpdatedAt)}
-                </p>
-              </div>
-            </div>
-            {deployment.errorMessage ? (
-              <div className="border-t border-destructive/20 bg-destructive/5 px-5 py-4 md:px-6">
-                <p className="text-sm text-destructive">{deployment.errorMessage}</p>
-              </div>
-            ) : null}
-          </div>
-
-          <Card className="overflow-hidden rounded-[24px] border-border/70 bg-[#0f1115] text-zinc-100 shadow-none">
-            <CardHeader className="border-b border-white/10">
-              <CardTitle className="text-white">Logs</CardTitle>
-              <CardDescription className="text-zinc-400">
-                Latest {logs.length} log lines from /deployments/:id/logs.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {shouldPoll ? (
-                <div className="border-b border-white/10 bg-white/[0.03] px-5 py-3 text-sm text-zinc-400">
-                  Refreshing while this deployment is still running.
-                </div>
-              ) : null}
-              {pollError ? (
-                <div className="border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-300">
-                  Live updates paused: {pollError}
-                </div>
-              ) : null}
-              {logs.length === 0 ? (
-                <div className="p-5">
-                  <Empty className="border border-white/10 bg-white/[0.03]">
-                    <EmptyHeader>
-                      <EmptyTitle className="text-white">No logs yet</EmptyTitle>
-                      <EmptyDescription className="text-zinc-400">
-                        Queue and worker activity logs will appear as the deployment
-                        progresses.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                </div>
-              ) : (
-                <div className="max-h-[34rem] overflow-auto px-4 py-4 font-mono text-xs">
-                  <div className="space-y-2">
-                    {logs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="grid gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 md:grid-cols-[auto_auto_1fr]"
-                      >
-                        <span className="text-zinc-500">#{log.sequence}</span>
-                        <span className="w-fit rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-zinc-400">
-                          {log.stream}
-                        </span>
-                        <span className="leading-relaxed text-zinc-100 wrap-break-word whitespace-pre-wrap">
-                          {log.message}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          )}
         </div>
-
-        <div className="space-y-4">
-          <Card className="rounded-[24px] border-border/70 shadow-none">
-            <CardHeader>
-              <CardTitle>Project</CardTitle>
-              <CardDescription>
-                Navigate back to the project-level workspace.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button asChild className="w-full rounded-full" variant="outline">
-                <Link href={`/projects/${projectId}`}>Open project</Link>
-              </Button>
-              {deployment.previewUrl ? (
-                <Button asChild className="w-full rounded-full" variant="secondary">
-                  <Link href={deployment.previewUrl} target="_blank">
-                    Preview deployment
-                    <ExternalLink className="size-3.5" />
-                  </Link>
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[24px] border-border/70 shadow-none">
-            <CardHeader>
-              <CardTitle>Runtime metadata</CardTitle>
-              <CardDescription>
-                Details used while the worker is processing this build.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <dl className="space-y-3 text-sm">
-                <div className="rounded-2xl border border-border/70 bg-muted/[0.35] p-4">
-                  <dt className="text-muted-foreground">Build started</dt>
-                  <dd className="mt-2 font-medium text-foreground">
-                    {formatDate(deployment.buildStartedAt)}
-                  </dd>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-muted/[0.35] p-4">
-                  <dt className="text-muted-foreground">Build finished</dt>
-                  <dd className="mt-2 font-medium text-foreground">
-                    {formatDate(deployment.buildFinishedAt)}
-                  </dd>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-muted/[0.35] p-4">
-                  <dt className="text-muted-foreground">Preview URL</dt>
-                  <dd className="mt-2 truncate font-medium text-foreground">
-                    {deployment.previewUrl ? (
-                      <Link
-                        href={deployment.previewUrl}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 text-primary underline-offset-4 hover:underline"
-                      >
-                        <span className="truncate">{deployment.previewUrl}</span>
-                        <ExternalLink className="size-3.5" />
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </dd>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-muted/[0.35] p-4">
-                  <dt className="text-muted-foreground">Artifact URL</dt>
-                  <dd className="mt-2 truncate font-medium text-foreground">
-                    {deployment.artifactUrl ? (
-                      <Link
-                        href={deployment.artifactUrl}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 text-primary underline-offset-4 hover:underline"
-                      >
-                        <span className="truncate">{deployment.artifactUrl}</span>
-                        <ExternalLink className="size-3.5" />
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Last update {formatDate(lastUpdatedAt)}
+        </p>
       </section>
-    </>
+      <aside
+        className="min-w-0 xl:border-l xl:border-border xl:pl-7"
+        aria-label="Deployment details"
+      >
+        <h2 className="text-sm font-medium">Deployment details</h2>
+        <dl className="mt-6 space-y-6 text-xs">
+          <div>
+            <dt className="text-muted-foreground">Commit</dt>
+            <dd className="mt-2 font-mono break-all">
+              {deployment.commitSha ?? "Not resolved yet"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Deployment ID</dt>
+            <dd className="mt-2 font-mono break-all">{deployment.id}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Created</dt>
+            <dd className="mt-2">{formatDate(deployment.createdAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Build started</dt>
+            <dd className="mt-2">{formatDate(deployment.buildStartedAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Build finished</dt>
+            <dd className="mt-2">{formatDate(deployment.buildFinishedAt)}</dd>
+          </div>
+          {deployment.artifactUrl ? (
+            <div>
+              <dt className="text-muted-foreground">Artifacts</dt>
+              <dd className="mt-2">
+                <Link
+                  href={deployment.artifactUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-primary hover:underline"
+                >
+                  Open artifacts{" "}
+                  <ExternalLink className="size-3" aria-hidden="true" />
+                </Link>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+        <div className="mt-7 flex flex-wrap gap-2 border-t border-border pt-5">
+          {deployment.previewUrl ? (
+            <Button asChild size="sm">
+              <Link
+                href={deployment.previewUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Preview deployment <ExternalLink className="size-3.5" />
+              </Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/projects/${projectId}`}>Open project</Link>
+          </Button>
+        </div>
+      </aside>
+    </div>
   )
 }
