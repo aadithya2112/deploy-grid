@@ -35,6 +35,8 @@ try {
     let reachable = false;
     try { const response = await fetch(process.env.HOST_TEST_URL,{signal:AbortSignal.timeout(3000)}); reachable = await response.text() === "runner-sentinel"; } catch {}
     if (reachable !== (process.env.EXPECTED === "reachable")) throw new Error("Unexpected host reachability: " + reachable);
+    const registry = await fetch("https://registry.npmjs.org/react/latest", {signal: AbortSignal.timeout(10000)});
+    if (!registry.ok || (await registry.json()).name !== "react") throw new Error("Public package registry is unreachable");
   `,
   );
   await new DockerCommandRunner().run({
@@ -44,9 +46,9 @@ try {
       HOST_TEST_URL: `http://${gateway}:${server.port}`,
       EXPECTED: expected!,
     },
-    timeoutMs: 10000,
+    timeoutMs: 20000,
   });
-  console.log(`Runner network verified: host ${expected}`);
+  console.log(`Runner network verified: host ${expected}, public package registry reachable`);
 } finally {
   server.stop(true);
   await rm(root, { recursive: true, force: true });

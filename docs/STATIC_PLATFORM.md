@@ -57,8 +57,10 @@ navigation, and HTML/directory resolution plus genuine 404s for multipage export
   mounted. Checkout/cache disk usage is bounded by the disposable runner's disk,
   not a per-project filesystem quota. Exhaustion fails that runner's job.
 - The provided hosted workflow blocks private/metadata networks from containers.
-  CI verifies host reachability before these rules and denial afterward, then
-  builds the framework fixtures with the rules enabled. Local/self-hosted runners
+  Build containers use the default Docker bridge and public Cloudflare DNS resolvers.
+  CI verifies host reachability before these rules and denial afterward, while
+  public package registry access remains available, then builds the framework
+  fixtures with the rules enabled. Local/self-hosted runners
   must provide equivalent network isolation.
 - Fork pull requests are not built automatically. Same-repository contributors
   with write access can execute builds and access that project's build variables.

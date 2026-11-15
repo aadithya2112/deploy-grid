@@ -58,7 +58,8 @@ jobs:
         run: bun run test
 
   web:
-    runs-on: ubuntu-latest
+    # Keep the OS compatible with the locked Playwright browser dependencies.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web

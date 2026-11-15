@@ -25,6 +25,13 @@ export function sandboxArgs(
     "--name",
     name,
     "--init",
+    "--network",
+    "bridge",
+    // The host's DNS may be private and intentionally blocked by the firewall.
+    "--dns",
+    "1.1.1.1",
+    "--dns",
+    "1.0.0.1",
     "--read-only",
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges",
