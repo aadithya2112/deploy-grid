@@ -28,7 +28,7 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: `E2E_TEST_MODE=1 E2E_TEST_USER_ID=e2e-user DEPLOY_GRID_API_URL=http://127.0.0.1:${apiPort} bunx next dev --hostname 127.0.0.1 --port ${appPort}`,
+      command: `STATIC_PLATFORM_ENABLED=${process.env.STATIC_PLATFORM_ENABLED === "true" ? "true" : "false"} E2E_TEST_MODE=1 E2E_TEST_USER_ID=e2e-user DEPLOY_GRID_API_URL=http://127.0.0.1:${apiPort} bunx next dev --hostname 127.0.0.1 --port ${appPort}`,
       port: appPort,
       reuseExistingServer: !process.env.CI,
       stdout: "pipe",

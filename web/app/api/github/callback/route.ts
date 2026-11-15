@@ -1,7 +1,9 @@
 import { cookies } from "next/headers"
 import { getAuth } from "@/lib/auth"
 import { ApiRequestError, requestApi } from "@/lib/api"
+import { isStaticPlatformEnabled } from "@/lib/static-platform"
 export async function GET(request: Request) {
+  if (!isStaticPlatformEnabled()) return new Response(null, { status: 404 })
   const { userId } = await getAuth()
   const jar = await cookies()
   const saved = jar.get("dg-github-state")?.value

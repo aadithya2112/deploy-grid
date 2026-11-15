@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { getAuth } from "@/lib/auth"
+import { isStaticPlatformEnabled } from "@/lib/static-platform"
 import {
   getProject,
   getPlatformOverview,
@@ -40,6 +41,7 @@ export default async function ManageProject({
   params: Promise<{ id: string }>
   searchParams: Promise<{ notice?: string }>
 }) {
+  if (!isStaticPlatformEnabled()) notFound()
   const [{ id }, { notice }, { userId }] = await Promise.all([
     params,
     searchParams,

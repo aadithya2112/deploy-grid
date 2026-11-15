@@ -1,7 +1,9 @@
 import { cookies } from "next/headers"
 import { getAuth } from "@/lib/auth"
 import { getProject } from "@/lib/api"
+import { isStaticPlatformEnabled } from "@/lib/static-platform"
 export async function GET(request: Request) {
+  if (!isStaticPlatformEnabled()) return new Response(null, { status: 404 })
   const { userId } = await getAuth()
   if (!userId) return new Response("Unauthorized", { status: 401 })
   const projectId = new URL(request.url).searchParams.get("projectId") ?? ""

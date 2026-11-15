@@ -1,10 +1,12 @@
 "use server"
 import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { getAuth } from "@/lib/auth"
+import { isStaticPlatformEnabled } from "@/lib/static-platform"
 import { ApiRequestError, requestApi } from "@/lib/api"
 
 export async function manageProjectAction(data: FormData) {
+  if (!isStaticPlatformEnabled()) notFound()
   const { userId } = await getAuth()
   if (!userId) redirect("/sign-in")
   const projectId = String(data.get("projectId") ?? "")

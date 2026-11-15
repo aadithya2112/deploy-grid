@@ -36,6 +36,10 @@ test("deployment page renders ready logs for an existing deployment", async ({
 test("release management promotes a retained build and exposes production", async ({
   page,
 }) => {
+  test.skip(
+    process.env.STATIC_PLATFORM_ENABLED !== "true",
+    "Release controls are opt-in"
+  )
   await page.goto("/projects/12345678-1234-1234-1234-123456789012/manage")
   await expect(page.getByText("No production release yet")).toBeVisible()
   await expect(
@@ -51,4 +55,31 @@ test("release management promotes a retained build and exposes production", asyn
   await expect(
     page.getByRole("button", { name: "Promote", exact: true })
   ).toBeDisabled()
+})
+
+test("legacy dashboard hides and blocks release management before backend cutover", async ({
+  page,
+}) => {
+  test.skip(
+    process.env.STATIC_PLATFORM_ENABLED === "true",
+    "Legacy rollout mode"
+  )
+  const project = "/projects/12345678-1234-1234-1234-123456789012"
+  await page.goto(project)
+  await expect(
+    page.getByRole("button", { name: "Redeploy latest" })
+  ).toBeVisible()
+  await expect(page.getByRole("link", { name: "Manage releases" })).toHaveCount(
+    0
+  )
+  expect((await page.goto(`${project}/manage`))?.status()).toBe(404)
+  for (const route of ["connect", "callback"]) {
+    expect(
+      (
+        await page.request.get(
+          `/api/github/${route}?projectId=${project.split("/").at(-1)}`
+        )
+      ).status()
+    ).toBe(404)
+  }
 })

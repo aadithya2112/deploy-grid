@@ -76,8 +76,14 @@ jobs:
         run: bun run typecheck
       - name: Unit tests
         run: bun run test
-      - name: E2E tests
+      - name: Legacy dashboard E2E tests
         run: bun run test:e2e
+        env:
+          STATIC_PLATFORM_ENABLED: "false"
+      - name: Static platform E2E tests
+        run: bun run test:e2e
+        env:
+          STATIC_PLATFORM_ENABLED: "true"
 
   platform:
     runs-on: ubuntu-latest

@@ -133,6 +133,13 @@ do not infer their schema from the older Drizzle model alone.
 
 ## Hosted setup (credentials required)
 
+The dashboard is safe to merge and deploy against the existing API with
+`STATIC_PLATFORM_ENABLED` unset or `false` (the default). Legacy project creation,
+deployments, logs, and environment reads keep their existing API contract. Release
+management and GitHub OAuth entry points return 404 while disabled; their server
+actions also refuse requests, including direct submissions. Keep this server-only
+flag off throughout the cutover and enable it only at the final activation step.
+
 1. Choose the Cloudflare account, private R2 bucket, dedicated site domain, and
    dashboard URL. Replace the sample `sites.example.com` and bucket names in the
    Wrangler configs. Add a proxied wildcard DNS record and a Worker route for
@@ -159,16 +166,23 @@ do not infer their schema from the older Drizzle model alone.
    The App installation on the builder repository needs Actions write access.
 6. Dashboard server environment: `DEPLOY_GRID_API_URL`, `DEPLOY_GRID_API_TOKEN`
    (same value as `API_AUTH_TOKEN`), `GITHUB_CLIENT_ID`, `WEB_BASE_URL`; preserve
-   existing Clerk configuration. The browser never receives the API token.
+   existing Clerk configuration. Keep `STATIC_PLATFORM_ENABLED=false` until the
+   new backend is ready. The browser never receives the API token.
 7. Configure `.github/workflows/builds.yml` repository secrets and variables as
    named in that file. `ARTIFACT_BASE_URL` is required by the existing storage
    client; preview links are sourced from the database's dedicated site URLs.
    Set `DEPLOY_GRID_BUILDS_ENABLED=true` only after the workflow and isolation
    rules are reviewed. The hourly schedule is a recovery backstop and may be
    delayed by GitHub. For private repositories, watch Actions usage/storage.
-8. Deploy API then edge with their local `bunx wrangler deploy`, deploy the
-   dashboard, and test public/private repo builds, GitHub OAuth, signed webhooks,
-   branch pushes, PR previews, PR closure, production promotion and rollback.
+8. Deploy API then edge with their local `bunx wrangler deploy`. Verify the new
+   API/schema, site routing, and hosted builder using a staging dashboard with
+   `STATIC_PLATFORM_ENABLED=true`. Test public/private repo builds, GitHub OAuth,
+   signed webhooks, branch pushes, PR previews, PR closure, production promotion
+   and rollback. Then point the production dashboard at the new API, set
+   `STATIC_PLATFORM_ENABLED=true` in its server environment, and redeploy it.
+   Leave the flag off if backend validation is incomplete; merging alone never
+   activates the new release controls. To hide them again, unset the flag or set
+   it to `false` and redeploy the dashboard.
 9. Only after successful cutover disable the old Cloud Run builder/API and unused
    associated resources. This implementation does not delete existing resources.
 

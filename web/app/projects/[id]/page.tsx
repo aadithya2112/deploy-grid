@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAuth } from "@/lib/auth"
+import { isStaticPlatformEnabled } from "@/lib/static-platform"
 import {
   ApiRequestError,
   getProject,
@@ -85,9 +86,11 @@ export default async function ProjectDetailPage({
       description="Deployments are the primary workspace for this repository. Environment variables and build defaults stay close by."
       actions={
         <>
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/projects/${id}/manage`}>Manage releases</Link>
-          </Button>
+          {isStaticPlatformEnabled() ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/projects/${id}/manage`}>Manage releases</Link>
+            </Button>
+          ) : null}
           <form action={deployProjectAction}>
             <input type="hidden" name="projectId" value={id} />
             {latestDeployment ? (
