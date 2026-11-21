@@ -1,11 +1,13 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ArrowRight, Rocket } from "lucide-react"
+import { ArrowLeft, Rocket } from "lucide-react"
 
 import { createProjectAndDeployAction } from "@/app/projects/actions"
+import { PageShell } from "@/components/layout/page-shell"
 import { ProjectCreateFields } from "@/components/projects/project-create-fields"
 import { Button } from "@/components/ui/button"
-import { PageShell } from "@/components/layout/page-shell"
+import { LinkPendingIndicator } from "@/components/ui/link-pending-indicator"
+import { SubmitButton } from "@/components/ui/submit-button"
 import { getAuth } from "@/lib/auth"
 
 export default async function NewProjectPage() {
@@ -16,65 +18,83 @@ export default async function NewProjectPage() {
     <PageShell
       title="New Project"
       section="new"
-      description="Connect a repository and start your first deployment."
+      description="Connect a GitHub repository and launch your first static deployment."
+      actions={
+        <Button asChild size="sm" variant="outline">
+          <Link href="/dashboard">
+            <ArrowLeft className="size-3.5" aria-hidden="true" />
+            <span>Back to projects</span>
+            <LinkPendingIndicator />
+          </Link>
+        </Button>
+      }
     >
-      <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_250px]">
+      <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_280px]">
         <form
           action={createProjectAndDeployAction}
-          className="min-w-0 space-y-6"
+          className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-[0_12px_36px_-28px_rgba(15,23,42,0.25)]"
         >
-          <div className="mb-7 border-b border-border pb-5">
-            <h2 className="text-sm font-medium">Repository</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Paste the GitHub URL. Custom build settings are optional.
+          <div className="border-b border-border px-6 py-5">
+            <h2 className="font-heading text-sm font-semibold tracking-tight">
+              Repository
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Paste a GitHub URL. Framework detection and build defaults run
+              automatically unless overridden.
             </p>
           </div>
-          <ProjectCreateFields />
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-6">
-            <Button asChild variant="ghost">
+          <div className="space-y-6 p-6">
+            <ProjectCreateFields />
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/25 px-6 py-4">
+            <Button asChild variant="ghost" size="sm">
               <Link href="/dashboard">Cancel</Link>
             </Button>
-            <Button type="submit">
-              Create and deploy <Rocket className="size-4" />
-            </Button>
+            <SubmitButton
+              size="sm"
+              pendingText="Creating & deploying…"
+              className="px-4"
+            >
+              <span>Create and deploy</span>
+              <Rocket className="size-3.5" aria-hidden="true" />
+            </SubmitButton>
           </div>
         </form>
-        <aside className="xl:border-l xl:border-border xl:pl-7">
-          <h2 className="text-sm font-medium">What happens next</h2>
-          <ol className="mt-6 space-y-7">
+
+        <aside className="rounded-xl border border-border bg-muted/30 p-6">
+          <h2 className="font-heading text-sm font-semibold tracking-tight">
+            What happens next
+          </h2>
+          <ol className="mt-5 space-y-5">
             {[
               [
                 "Connect the repository",
                 "Create a project or reuse an existing repository in your workspace.",
               ],
               [
-                "Build your site",
-                "Install dependencies and run the project's build command.",
+                "Run an isolated build",
+                "Detect your framework, install dependencies, and compile static assets.",
               ],
               [
-                "Follow the deployment",
-                "Open the live log to check progress and access the published output.",
+                "Stream live logs",
+                "Follow progress in real time and open the published output once ready.",
               ],
             ].map(([title, description], index) => (
               <li key={title} className="flex gap-3">
-                <span className="pt-0.5 font-mono text-xs text-primary">
-                  0{index + 1}
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-primary/10 font-mono text-[11px] font-medium text-primary dark:text-chart-2">
+                  {index + 1}
                 </span>
                 <div>
-                  <h3 className="text-xs font-medium">{title}</h3>
-                  <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                  <h3 className="text-xs font-medium text-foreground">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {description}
                   </p>
                 </div>
               </li>
             ))}
           </ol>
-          <Link
-            href="/dashboard"
-            className="mt-9 inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Back to projects <ArrowRight className="size-3" />
-          </Link>
         </aside>
       </div>
     </PageShell>

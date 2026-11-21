@@ -1,10 +1,12 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft, RefreshCcw } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 import { DeploymentLiveView } from "@/components/deployments/live-deployment-view"
 import { PageShell } from "@/components/layout/page-shell"
+import { RefreshButton } from "@/components/layout/refresh-button"
 import { Button } from "@/components/ui/button"
+import { LinkPendingIndicator } from "@/components/ui/link-pending-indicator"
 import { getAuth } from "@/lib/auth"
 import { ApiRequestError, getDeployment, listDeploymentLogs } from "@/lib/api"
 
@@ -55,16 +57,12 @@ export default async function DeploymentDetailPage({
         <>
           <Button asChild size="sm" variant="outline">
             <Link href={`/projects/${id}`}>
-              <ArrowLeft className="size-3.5" />
-              Back
+              <ArrowLeft className="size-3.5" aria-hidden="true" />
+              <span>Back</span>
+              <LinkPendingIndicator />
             </Link>
           </Button>
-          <Button asChild size="sm">
-            <Link href={`/projects/${id}/deployments/${deploymentId}`}>
-              <RefreshCcw className="size-3.5" />
-              Refresh
-            </Link>
-          </Button>
+          <RefreshButton variant="default" />
         </>
       }
     >
