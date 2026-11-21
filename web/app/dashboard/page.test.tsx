@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest"
 import {
   redirectMock,
   resetNavigationMocks,
+  useRouterMock,
 } from "@/tests/support/navigation"
 import { renderServerComponent } from "@/tests/support/server-component"
 
@@ -17,6 +18,7 @@ const {
 
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
+  useRouter: useRouterMock,
 }))
 
 vi.mock("@/lib/auth", () => ({

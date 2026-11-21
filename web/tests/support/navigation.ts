@@ -15,6 +15,7 @@ export class NotFoundError extends Error {
 }
 
 export const refreshMock = vi.fn()
+export const pushMock = vi.fn()
 
 export const redirectMock = vi.fn((location: string) => {
   throw new RedirectError(location)
@@ -26,10 +27,12 @@ export const notFoundMock = vi.fn(() => {
 
 export const useRouterMock = vi.fn(() => ({
   refresh: refreshMock,
+  push: pushMock,
 }))
 
 export function resetNavigationMocks() {
   refreshMock.mockReset()
+  pushMock.mockReset()
   redirectMock.mockClear()
   notFoundMock.mockClear()
   useRouterMock.mockClear()

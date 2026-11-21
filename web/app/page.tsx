@@ -1,140 +1,271 @@
 import Link from "next/link"
-import { ArrowRight, ChevronRight, Github, TerminalSquare } from "lucide-react"
+import {
+  ArrowRight,
+  CheckCircle2,
+  GitBranch,
+  Grid2X2,
+  History,
+  ShieldCheck,
+  Terminal,
+} from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
+import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { Button } from "@/components/ui/button"
+
+const frameworks = ["React + Vite", "Next.js", "Astro", "Vue"]
+
+const buildLogs = [
+  {
+    time: "09:14:02",
+    step: "detect",
+    message: "Vite + React detected (output: dist/)",
+  },
+  {
+    time: "09:14:04",
+    step: "cache",
+    message: "Restored lockfile dependencies",
+  },
+  {
+    time: "09:14:11",
+    step: "build",
+    message: "Compiled 42 static assets (1.8 MB)",
+  },
+  {
+    time: "09:14:12",
+    step: "edge",
+    message: "Published immutable release snapshot",
+  },
+]
+
+const capabilities = [
+  {
+    icon: ShieldCheck,
+    title: "Isolated builds",
+    description:
+      "Every commit runs inside a restricted container with framework auto-detection and cached dependencies.",
+  },
+  {
+    icon: Terminal,
+    title: "Live build logs",
+    description:
+      "Inspect install, build, and upload output as it runs, with complete timestamped history per deployment.",
+  },
+  {
+    icon: History,
+    title: "Instant rollbacks",
+    description:
+      "Releases are stored as immutable snapshots so you can promote previews or revert production without rebuilding.",
+  },
+]
 
 export default function LandingPage() {
   return (
-    <main className="min-h-svh bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.09),transparent_38%),linear-gradient(to_bottom,transparent,rgba(15,23,42,0.02))] px-4 py-4 md:px-8 md:py-6">
-      <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-7xl flex-col rounded-[32px] border border-border/70 bg-background/95 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.35)]">
-        <header className="flex items-center justify-between border-b border-border/70 px-5 py-4 md:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-2xl border border-border/70 bg-muted/60">
-              <TerminalSquare className="size-4" />
-            </div>
-            <div>
-              <p className="font-heading text-sm font-semibold tracking-tight">
-                Deploy Grid
-              </p>
-              <p className="text-xs text-muted-foreground">
-                GitHub URL in. Build logs out.
-              </p>
-            </div>
-          </div>
+    <div className="relative flex min-h-svh flex-col bg-background text-foreground">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[440px] bg-[radial-gradient(ellipse_70%_55%_at_50%_0%,oklch(0.511_0.096_186.391_/_0.11),transparent_72%)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_0%,oklch(0.704_0.14_182.503_/_0.12),transparent_72%)]"
+      />
+
+      <header className="relative z-10 border-b border-border/80 bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6 sm:px-8">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 font-heading text-base font-semibold tracking-tight"
+          >
+            <Grid2X2
+              className="size-8 rounded-lg bg-primary/10 p-1.5 text-primary dark:text-chart-2"
+              aria-hidden="true"
+            />
+            <span>Deploy Grid</span>
+          </Link>
+
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button asChild variant="ghost" size="sm">
-              <Link href="/sign-up">Create account</Link>
+              <Link href="/sign-in">Sign in</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/sign-in">
-                Sign in
-                <ChevronRight className="size-3.5" />
-              </Link>
+              <Link href="/sign-up">Get started</Link>
             </Button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <section className="grid flex-1 gap-10 px-5 py-10 md:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] md:px-8 md:py-14">
-          <div className="flex max-w-2xl flex-col justify-center animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <Badge
-              variant="outline"
-              className="w-fit rounded-full border-border/70 bg-background/70 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground"
-            >
-              Operator-first deployments
-            </Badge>
-            <h1 className="mt-6 max-w-xl font-heading text-4xl font-semibold tracking-[-0.04em] text-foreground md:text-6xl">
-              Deploy repos with the calm, traceable feel of a Vercel build log.
+      <main className="relative z-10 flex-1">
+        <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-16 sm:px-8 md:py-24 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+              <span
+                className="size-1.5 rounded-full bg-primary dark:bg-chart-2"
+                aria-hidden="true"
+              />
+              Static deployment platform
+            </div>
+
+            <h1 className="mt-6 font-heading text-4xl font-semibold tracking-[-0.03em] text-balance sm:text-5xl lg:text-[3.35rem] lg:leading-[1.08]">
+              Ship static sites straight from GitHub.
             </h1>
-            <p className="mt-5 max-w-lg text-sm leading-7 text-muted-foreground md:text-base">
-              Sign in with Clerk, drop in a GitHub URL, and move straight into a
-              live deployment view with status, timestamps, and worker logs.
+
+            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground">
+              Connect a repository, follow isolated builds in real time, and
+              promote verified releases to production with instant rollbacks.
             </p>
+
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="rounded-full px-5">
+              <Button asChild size="lg" className="h-10 px-5">
                 <Link href="/sign-in">
                   Open dashboard
-                  <ArrowRight className="size-4" />
+                  <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="rounded-full px-5">
-                <Link href="/sign-up">
-                  <Github className="size-4" />
-                  Start with Clerk
-                </Link>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-10 px-5"
+              >
+                <Link href="/sign-up">Create account</Link>
               </Button>
             </div>
-            <div className="mt-10 grid gap-4 text-sm text-muted-foreground md:grid-cols-3">
-              <div className="border-l border-border/70 pl-4">
-                <p className="font-medium text-foreground">Project creation</p>
-                <p className="mt-1 leading-6">
-                  One URL creates or reuses the project and starts the first deployment.
-                </p>
-              </div>
-              <div className="border-l border-border/70 pl-4">
-                <p className="font-medium text-foreground">Live build logs</p>
-                <p className="mt-1 leading-6">
-                  Deployment status and logs refresh while the worker is building.
-                </p>
-              </div>
-              <div className="border-l border-border/70 pl-4">
-                <p className="font-medium text-foreground">User-scoped access</p>
-                <p className="mt-1 leading-6">
-                  Every project and deployment stays scoped to the signed-in Clerk user.
-                </p>
-              </div>
+
+            <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/80 pt-6 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Frameworks</span>
+              <span aria-hidden="true" className="text-border">
+                /
+              </span>
+              {frameworks.map((framework, index) => (
+                <span key={framework} className="inline-flex items-center gap-3">
+                  <span className="font-mono text-[11px]">{framework}</span>
+                  {index < frameworks.length - 1 ? (
+                    <span aria-hidden="true" className="text-border">
+                      ·
+                    </span>
+                  ) : null}
+                </span>
+              ))}
             </div>
           </div>
 
-          <div className="flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 md:justify-end">
-            <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-border/70 bg-[#0f1115] shadow-[0_24px_80px_-36px_rgba(15,23,42,0.65)]">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs text-zinc-400">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-400" />
-                  deployment-ready
+          <div className="w-full">
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_24px_60px_-32px_rgba(15,23,42,0.22)] dark:shadow-[0_24px_60px_-32px_rgba(0,0,0,0.6)]">
+              <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="truncate font-heading text-sm font-medium text-foreground">
+                    acme / marketing-site
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    <GitBranch className="size-3" aria-hidden="true" />
+                    main
+                  </span>
                 </div>
-                <span>build logs</span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                  <span
+                    className="size-1.5 rounded-full bg-emerald-500"
+                    aria-hidden="true"
+                  />
+                  Ready
+                </span>
               </div>
-              <div className="space-y-4 px-4 py-5 font-mono text-xs text-zinc-200">
-                <div className="space-y-2">
-                  <p className="text-zinc-500">$ deploy-grid create https://github.com/acme/edge-store.git</p>
-                  <p>#1 [system] repository cloned</p>
-                  <p>#2 [stdout] bun install</p>
-                  <p>#3 [stdout] bun run build</p>
+
+              <div className="bg-muted/30 px-5 py-4 font-mono text-xs dark:bg-background/60">
+                <div className="space-y-2.5">
+                  {buildLogs.map((entry) => (
+                    <div
+                      key={entry.time + entry.step}
+                      className="grid grid-cols-[62px_54px_minmax(0,1fr)] items-baseline gap-2.5 leading-5"
+                    >
+                      <span className="text-muted-foreground/70">
+                        {entry.time}
+                      </span>
+                      <span className="text-primary dark:text-chart-2">
+                        [{entry.step}]
+                      </span>
+                      <span className="text-foreground/90">
+                        {entry.message}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-white">edge-store</p>
-                      <p className="mt-1 text-zinc-400">Production build is healthy and ready to inspect.</p>
-                    </div>
-                    <Badge className="rounded-full bg-emerald-500/12 px-3 text-emerald-300 hover:bg-emerald-500/12">
-                      ready
-                    </Badge>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-white/8 bg-black/20 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-                        Commit
-                      </p>
-                      <p className="mt-2 text-zinc-100">abc123def456</p>
-                    </div>
-                    <div className="rounded-xl border border-white/8 bg-black/20 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-                        Preview
-                      </p>
-                      <p className="mt-2 text-zinc-100">edge-store-preview.vercel.app</p>
-                    </div>
+              </div>
+
+              <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)] divide-x divide-border border-t border-border text-xs">
+                <div className="px-5 py-3.5">
+                  <p className="text-[11px] text-muted-foreground">
+                    Production URL
+                  </p>
+                  <p className="mt-1 truncate font-mono text-foreground">
+                    marketing.deploygrid.app
+                  </p>
+                </div>
+                <div className="px-5 py-3.5">
+                  <p className="text-[11px] text-muted-foreground">Release</p>
+                  <div className="mt-1 flex items-center gap-2 font-mono text-foreground">
+                    <span>f8c2a19</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <CheckCircle2
+                        className="size-3.5 text-primary dark:text-chart-2"
+                        aria-hidden="true"
+                      />
+                      10.4s
+                    </span>
                   </div>
                 </div>
-                <p className="text-zinc-500">
-                  Press <span className="rounded bg-white/8 px-1.5 py-0.5 text-zinc-200">d</span> to toggle theme in the app.
-                </p>
               </div>
             </div>
           </div>
         </section>
-      </div>
-    </main>
+
+        <section
+          aria-label="Platform capabilities"
+          className="border-t border-border/80"
+        >
+          <div className="mx-auto grid w-full max-w-6xl divide-y divide-border/80 px-6 sm:px-8 md:grid-cols-3 md:divide-x md:divide-y-0">
+            {capabilities.map((item) => {
+              const Icon = item.icon
+              return (
+                <div
+                  key={item.title}
+                  className="py-8 md:px-8 md:py-10 md:first:pl-0 md:last:pr-0"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon
+                      className="size-4 text-primary dark:text-chart-2"
+                      aria-hidden="true"
+                    />
+                    <h2 className="font-heading text-sm font-semibold tracking-tight text-foreground">
+                      {item.title}
+                    </h2>
+                  </div>
+                  <p className="mt-2.5 text-sm leading-6 text-muted-foreground">
+                    {item.description}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      </main>
+
+      <footer className="relative z-10 border-t border-border/80">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5 text-xs text-muted-foreground sm:px-8">
+          <p>Deploy Grid · Static site hosting &amp; release management</p>
+          <div className="flex items-center gap-5">
+            <Link
+              href="/sign-in"
+              className="transition-colors hover:text-foreground"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/sign-up"
+              className="transition-colors hover:text-foreground"
+            >
+              Create account
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
   )
 }
