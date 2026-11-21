@@ -26,6 +26,15 @@ export interface CreateProjectInput {
   outputDirectory?: string | null
 }
 
+export interface UpdateProjectInput {
+  name?: string
+  defaultBranch?: string
+  rootDirectory?: string | null
+  installCommand?: string | null
+  buildCommand?: string | null
+  outputDirectory?: string | null
+}
+
 export class ApiRequestError extends Error {
   status: number
 
@@ -253,6 +262,64 @@ export async function createProjectDeployment(
     body: input,
     clerkUserId,
   })
+}
+
+export async function redeployDeployment(
+  clerkUserId: string,
+  deploymentId: string,
+  input?: { gitRef?: string }
+): Promise<DeploymentSnapshot> {
+  return requestApi<DeploymentSnapshot>(
+    `/deployments/${encodeURIComponent(deploymentId)}/redeploy`,
+    {
+      method: "POST",
+      body: input ?? {},
+      clerkUserId,
+    }
+  )
+}
+
+export async function updateProject(
+  clerkUserId: string,
+  projectId: string,
+  input: UpdateProjectInput
+): Promise<ProjectSnapshot> {
+  return requestApi<ProjectSnapshot>(`/projects/${projectId}`, {
+    method: "PATCH",
+    body: input,
+    clerkUserId,
+  })
+}
+
+export async function upsertProjectEnvVar(
+  clerkUserId: string,
+  projectId: string,
+  key: string,
+  input: { value: string; target: "all" | "preview" | "production" }
+) {
+  return requestApi(
+    `/projects/${projectId}/env-vars/${encodeURIComponent(key)}`,
+    {
+      method: "PUT",
+      body: input,
+      clerkUserId,
+    }
+  )
+}
+
+export async function deleteProjectEnvVar(
+  clerkUserId: string,
+  projectId: string,
+  key: string,
+  target: "all" | "preview" | "production"
+): Promise<void> {
+  await requestApi<void>(
+    `/projects/${projectId}/env-vars/${encodeURIComponent(key)}?target=${encodeURIComponent(target)}`,
+    {
+      method: "DELETE",
+      clerkUserId,
+    }
+  )
 }
 
 export async function getPlatformOverview(userId: string, projectId: string) {

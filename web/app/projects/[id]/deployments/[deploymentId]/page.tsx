@@ -1,14 +1,17 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ExternalLink, RotateCcw } from "lucide-react"
 
+import { redeployDeploymentAction } from "@/app/projects/actions"
 import { DeploymentLiveView } from "@/components/deployments/live-deployment-view"
 import { PageShell } from "@/components/layout/page-shell"
 import { RefreshButton } from "@/components/layout/refresh-button"
 import { Button } from "@/components/ui/button"
 import { LinkPendingIndicator } from "@/components/ui/link-pending-indicator"
-import { getAuth } from "@/lib/auth"
+import { SubmitButton } from "@/components/ui/submit-button"
 import { ApiRequestError, getDeployment, listDeploymentLogs } from "@/lib/api"
+import { getAuth } from "@/lib/auth"
+import { getDeploymentLiveUrl } from "@/lib/deployment-format"
 
 export default async function DeploymentDetailPage({
   params,
@@ -39,6 +42,8 @@ export default async function DeploymentDetailPage({
   }
 
   const logs = await listDeploymentLogs(userId, deploymentId, { limit: 200 })
+  const liveUrl =
+    deployment.status === "ready" ? getDeploymentLiveUrl(deployment) : null
 
   return (
     <PageShell
@@ -62,7 +67,27 @@ export default async function DeploymentDetailPage({
               <LinkPendingIndicator />
             </Link>
           </Button>
-          <RefreshButton variant="default" />
+          <RefreshButton variant="outline" />
+          <form action={redeployDeploymentAction}>
+            <input type="hidden" name="projectId" value={id} />
+            <input type="hidden" name="deploymentId" value={deployment.id} />
+            <SubmitButton
+              size="sm"
+              variant={liveUrl ? "outline" : "default"}
+              pendingText="Redeploying…"
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              <span>Redeploy</span>
+            </SubmitButton>
+          </form>
+          {liveUrl ? (
+            <Button asChild size="sm">
+              <a href={liveUrl} target="_blank" rel="noreferrer">
+                <span>Visit site</span>
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+              </a>
+            </Button>
+          ) : null}
         </>
       }
     >
