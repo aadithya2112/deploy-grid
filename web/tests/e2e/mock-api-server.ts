@@ -52,6 +52,18 @@ let deploymentCounter = 1
 const projects = new Map<string, ProjectSnapshot>()
 const deployments = new Map<string, DeploymentSnapshot>()
 const deploymentLogs = new Map<string, DeploymentLogEntry[]>()
+const projectEnvVars = new Map<
+  string,
+  {
+    id: string
+    projectId: string
+    key: string
+    target: "all" | "preview" | "production"
+    maskedValue: string
+    createdAt: string
+    updatedAt: string
+  }[]
+>()
 
 const seededProject: ProjectSnapshot = {
   id: "project-ready",
@@ -234,15 +246,147 @@ const server = createServer(async (request, response) => {
     }
     if (projectRead[2] === "deployments")
       sendJson(response, 200, {
-        deployments: Array.from(deployments.values()).filter(
-          (item) => item.projectId === project.id
-        ),
+        deployments: Array.from(deployments.values())
+          .filter((item) => item.projectId === project.id)
+          .reverse(),
         projectId: project.id,
         pageInfo: { limit: 20, offset: 0, hasMore: false, nextOffset: null },
       })
     else if (projectRead[2] === "env-vars")
-      sendJson(response, 200, { projectId: project.id, envVars: [] })
+      sendJson(response, 200, {
+        projectId: project.id,
+        envVars: projectEnvVars.get(project.id) ?? [],
+      })
     else sendJson(response, 200, project)
+    return
+  }
+
+  const projectPatch = /^\/projects\/([^/]+)$/.exec(url.pathname)
+  if (request.method === "PATCH" && projectPatch) {
+    const project = projects.get(projectPatch[1]!)
+    if (!project) {
+      sendJson(response, 404, { error: "Project not found" })
+      return
+    }
+    const body = await parseJson(request)
+    const updated: ProjectSnapshot = {
+      ...project,
+      defaultBranch:
+        typeof body.defaultBranch === "string" && body.defaultBranch.trim()
+          ? body.defaultBranch.trim()
+          : project.defaultBranch,
+      rootDirectory:
+        body.rootDirectory === undefined
+          ? project.rootDirectory
+          : typeof body.rootDirectory === "string"
+            ? body.rootDirectory
+            : null,
+      installCommand:
+        body.installCommand === undefined
+          ? project.installCommand
+          : typeof body.installCommand === "string"
+            ? body.installCommand
+            : null,
+      buildCommand:
+        body.buildCommand === undefined
+          ? project.buildCommand
+          : typeof body.buildCommand === "string"
+            ? body.buildCommand
+            : null,
+      outputDirectory:
+        body.outputDirectory === undefined
+          ? project.outputDirectory
+          : typeof body.outputDirectory === "string"
+            ? body.outputDirectory
+            : null,
+      updatedAt: now(),
+    }
+    projects.set(project.id, updated)
+    sendJson(response, 200, updated)
+    return
+  }
+
+  const envVarRoute = /^\/projects\/([^/]+)\/env-vars\/([^/]+)$/.exec(
+    url.pathname
+  )
+  if (envVarRoute) {
+    const projectId = envVarRoute[1]!
+    const key = decodeURIComponent(envVarRoute[2]!)
+    const project = projects.get(projectId)
+    if (!project) {
+      sendJson(response, 404, { error: "Project not found" })
+      return
+    }
+    const existing = projectEnvVars.get(projectId) ?? []
+    if (request.method === "PUT") {
+      const body = await parseJson(request)
+      const target: "all" | "preview" | "production" =
+        body.target === "preview" || body.target === "production"
+          ? body.target
+          : "all"
+      const value = String(body.value ?? "")
+      const record = {
+        id: `${projectId}-${key}-${target}`,
+        projectId,
+        key,
+        target,
+        maskedValue: `****${value.slice(-4)}`,
+        createdAt: now(),
+        updatedAt: now(),
+      }
+      const next = [
+        ...existing.filter((item) => !(item.key === key && item.target === target)),
+        record,
+      ]
+      projectEnvVars.set(projectId, next)
+      sendJson(response, 201, record)
+      return
+    }
+    if (request.method === "DELETE") {
+      const target = url.searchParams.get("target") ?? "all"
+      projectEnvVars.set(
+        projectId,
+        existing.filter((item) => !(item.key === key && item.target === target))
+      )
+      response.writeHead(204)
+      response.end()
+      return
+    }
+  }
+
+  const redeployMatch = /^\/deployments\/([^/]+)\/redeploy$/.exec(url.pathname)
+  if (request.method === "POST" && redeployMatch) {
+    const source = deployments.get(redeployMatch[1]!)
+    if (!source) {
+      sendJson(response, 404, { error: "Deployment not found" })
+      return
+    }
+    const deploymentId = `deployment-created-${deploymentCounter++}`
+    const redeployed: DeploymentSnapshot = {
+      ...source,
+      id: deploymentId,
+      status: "building",
+      commitSha: null,
+      previewUrl: null,
+      artifactUrl: null,
+      buildStartedAt: now(),
+      buildFinishedAt: null,
+      createdAt: now(),
+      updatedAt: now(),
+      errorMessage: null,
+    }
+    deployments.set(redeployed.id, redeployed)
+    deploymentLogs.set(redeployed.id, [
+      {
+        id: `${redeployed.id}-log-1`,
+        deploymentId: redeployed.id,
+        stream: "system",
+        sequence: 1,
+        message: "redeploy queued",
+        createdAt: now(),
+      },
+    ])
+    sendJson(response, 202, redeployed)
     return
   }
 

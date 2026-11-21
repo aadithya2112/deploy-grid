@@ -5,6 +5,7 @@ import {
   notFoundMock,
   redirectMock,
   resetNavigationMocks,
+  useRouterMock,
 } from "@/tests/support/navigation"
 import { renderServerComponent } from "@/tests/support/server-component"
 
@@ -23,6 +24,7 @@ const {
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
   notFound: notFoundMock,
+  useRouter: useRouterMock,
 }))
 
 vi.mock("@/lib/auth", () => ({
@@ -149,5 +151,63 @@ describe("ProjectDetailPage", () => {
     expect(
       screen.getAllByRole("button", { name: /deploy now/i }).length
     ).toBeGreaterThan(0)
+  })
+
+  test("highlights live site URL and surfaces a newer failed build banner separately", async () => {
+    listProjectDeploymentsMock.mockResolvedValueOnce({
+      projectId: "project-123",
+      deployments: [
+        {
+          id: "deployment-failed",
+          projectId: "project-123",
+          repoUrl: "https://github.com/acme/demo.git",
+          gitRef: "feat/nav",
+          status: "failed",
+          commitSha: "deadbeef1234",
+          previewUrl: null,
+          artifactUrl: null,
+          buildStartedAt: "2025-01-02T00:00:00.000Z",
+          buildFinishedAt: "2025-01-02T00:00:25.000Z",
+          createdAt: "2025-01-02T00:00:00.000Z",
+          updatedAt: "2025-01-02T00:00:25.000Z",
+          errorMessage: "vite build exited with code 1",
+        },
+        {
+          id: "deployment-live",
+          projectId: "project-123",
+          repoUrl: "https://github.com/acme/demo.git",
+          gitRef: "main",
+          status: "ready",
+          commitSha: "abc123def456",
+          previewUrl: "https://demo.deploygrid.app",
+          artifactUrl: null,
+          buildStartedAt: "2025-01-01T00:00:00.000Z",
+          buildFinishedAt: "2025-01-01T00:00:18.000Z",
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-01T00:00:18.000Z",
+          errorMessage: null,
+        },
+      ],
+      pageInfo: { limit: 20, offset: 0, hasMore: false, nextOffset: null },
+    })
+
+    await renderServerComponent(
+      ProjectDetailPage({ params: Promise.resolve({ id: "project-123" }) })
+    )
+
+    expect(
+      screen.getByText(/latest build on feat\/nav failed/i)
+    ).toBeInTheDocument()
+    expect(
+      screen.getAllByText("vite build exited with code 1").length
+    ).toBeGreaterThan(0)
+    expect(screen.getByText("Currently live")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Visit site" })).toHaveAttribute(
+      "href",
+      "https://demo.deploygrid.app"
+    )
+    expect(
+      screen.getByRole("button", { name: /retry build/i })
+    ).toBeInTheDocument()
   })
 })

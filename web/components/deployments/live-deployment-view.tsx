@@ -1,11 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ExternalLink, GitBranch, RefreshCcw, Terminal } from "lucide-react"
+import {
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  GitBranch,
+  Loader2,
+  RefreshCcw,
+  Terminal,
+  XCircle,
+} from "lucide-react"
 
 import { DeploymentStatusBadge } from "@/components/deployments/status-badge"
 import { Button } from "@/components/ui/button"
+import { CopyButton } from "@/components/ui/copy-button"
+import {
+  formatBuildDuration,
+  getDeploymentLiveUrl,
+} from "@/lib/deployment-format"
 import type { DeploymentLogEntry, DeploymentSnapshot } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -21,6 +35,8 @@ interface DeploymentLogsPayload {
   deploymentId: string
   logs: DeploymentLogEntry[]
 }
+
+type StreamFilter = "all" | "stdout" | "stderr" | "system"
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -60,6 +76,7 @@ export function DeploymentLiveView({
   const [logs, setLogs] = useState(initialLogs)
   const [pollError, setPollError] = useState<string | null>(null)
   const [isFetching, setIsFetching] = useState(false)
+  const [streamFilter, setStreamFilter] = useState<StreamFilter>("all")
   const [lastUpdatedAt, setLastUpdatedAt] = useState(
     initialDeployment.updatedAt
   )
@@ -130,35 +147,171 @@ export function DeploymentLiveView({
     }
   }, [deploymentId, intervalMs, projectId, shouldPoll])
 
+  const filteredLogs = useMemo(() => {
+    if (streamFilter === "all") return logs
+    return logs.filter((entry) => entry.stream === streamFilter)
+  }, [logs, streamFilter])
+
+  const rawLogsText = useMemo(
+    () =>
+      filteredLogs
+        .map((entry) => `[${entry.sequence}] [${entry.stream}] ${entry.message}`)
+        .join("\n"),
+    [filteredLogs]
+  )
+
+  const liveUrl =
+    deployment.status === "ready" ? getDeploymentLiveUrl(deployment) : null
+  const duration = formatBuildDuration(
+    deployment.buildStartedAt,
+    deployment.buildFinishedAt,
+    deployment.status
+  )
+
+  const stage2State =
+    deployment.status === "queued"
+      ? "pending"
+      : deployment.status === "building"
+        ? "active"
+        : "done"
+  const stage3State =
+    deployment.status === "ready"
+      ? "done"
+      : deployment.status === "failed" || deployment.status === "cancelled"
+        ? "failed"
+        : "pending"
+
   return (
     <div className="grid min-w-0 items-start gap-8 xl:grid-cols-[minmax(0,1fr)_280px]">
       <section className="min-w-0 space-y-4" aria-labelledby="build-output-heading">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-3.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <DeploymentStatusBadge status={deployment.status} />
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-0.5 font-mono text-xs text-muted-foreground">
-              <GitBranch className="size-3" aria-hidden="true" />
-              {deployment.gitRef}
-            </span>
+        <div className="space-y-4 rounded-xl border border-border bg-card px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <DeploymentStatusBadge status={deployment.status} />
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-0.5 font-mono text-xs text-muted-foreground">
+                <GitBranch className="size-3" aria-hidden="true" />
+                {deployment.gitRef}
+              </span>
+              <span className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                <Clock className="size-3" aria-hidden="true" />
+                {duration}
+              </span>
+            </div>
+            {shouldPoll ? (
+              <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <RefreshCcw
+                  className={cn(
+                    "size-3.5 text-primary dark:text-chart-2",
+                    isFetching
+                      ? "animate-spin motion-reduce:animate-none"
+                      : "animate-pulse motion-reduce:animate-none"
+                  )}
+                  aria-hidden="true"
+                />
+                {isFetching ? "Syncing logs…" : "Live updates"}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Build complete
+              </span>
+            )}
           </div>
-          {shouldPoll ? (
-            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-              <RefreshCcw
-                className={cn(
-                  "size-3.5 text-primary dark:text-chart-2",
-                  isFetching
-                    ? "animate-spin motion-reduce:animate-none"
-                    : "animate-pulse motion-reduce:animate-none"
-                )}
+
+          <ol
+            aria-label="Deployment progress"
+            className="grid grid-cols-3 gap-2 border-t border-border/70 pt-3.5 text-xs"
+          >
+            <li className="flex items-center gap-2 text-foreground">
+              <CheckCircle2
+                className="size-3.5 shrink-0 text-primary dark:text-chart-2"
                 aria-hidden="true"
               />
-              {isFetching ? "Syncing logs…" : "Live updates"}
-            </span>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Build complete
-            </span>
-          )}
+              <span>Queued</span>
+            </li>
+            <li
+              className={cn(
+                "flex items-center gap-2",
+                stage2State === "pending"
+                  ? "text-muted-foreground"
+                  : "text-foreground"
+              )}
+            >
+              {stage2State === "active" ? (
+                <Loader2
+                  className="size-3.5 shrink-0 animate-spin text-sky-500 motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : stage2State === "done" ? (
+                <CheckCircle2
+                  className="size-3.5 shrink-0 text-primary dark:text-chart-2"
+                  aria-hidden="true"
+                />
+              ) : (
+                <span
+                  className="size-3.5 shrink-0 rounded-full border border-border"
+                  aria-hidden="true"
+                />
+              )}
+              <span>Building</span>
+            </li>
+            <li
+              className={cn(
+                "flex items-center gap-2",
+                stage3State === "pending"
+                  ? "text-muted-foreground"
+                  : stage3State === "failed"
+                    ? "text-destructive"
+                    : "text-foreground"
+              )}
+            >
+              {stage3State === "done" ? (
+                <CheckCircle2
+                  className="size-3.5 shrink-0 text-emerald-500"
+                  aria-hidden="true"
+                />
+              ) : stage3State === "failed" ? (
+                <XCircle
+                  className="size-3.5 shrink-0 text-destructive"
+                  aria-hidden="true"
+                />
+              ) : (
+                <span
+                  className="size-3.5 shrink-0 rounded-full border border-border"
+                  aria-hidden="true"
+                />
+              )}
+              <span className="capitalize">
+                {deployment.status === "failed"
+                  ? "Failed"
+                  : deployment.status === "cancelled"
+                    ? "Cancelled"
+                    : "Ready"}
+              </span>
+            </li>
+          </ol>
+
+          {liveUrl ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+              <a
+                href={liveUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-primary hover:underline dark:text-chart-2"
+              >
+                <span className="truncate">
+                  {liveUrl.replace(/^https?:\/\//, "")}
+                </span>
+                <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+              </a>
+              <CopyButton
+                value={liveUrl}
+                label="Copy URL"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+              />
+            </div>
+          ) : null}
         </div>
 
         {deployment.errorMessage ? (
@@ -171,7 +324,7 @@ export function DeploymentLiveView({
         ) : null}
 
         <div className="overflow-hidden rounded-xl border border-border bg-[#0f1115] text-zinc-100 shadow-[0_18px_48px_-32px_rgba(15,23,42,0.5)]">
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-2.5">
             <div className="flex items-center gap-2">
               <Terminal
                 className="size-3.5 text-zinc-400"
@@ -183,10 +336,47 @@ export function DeploymentLiveView({
               >
                 Logs
               </h2>
+              <span className="font-mono text-[11px] text-zinc-500">
+                {filteredLogs.length} / {logs.length} lines
+              </span>
             </div>
-            <span className="font-mono text-[11px] text-zinc-400">
-              {logs.length} log lines
-            </span>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div
+                role="tablist"
+                aria-label="Filter log stream"
+                className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5"
+              >
+                {(["all", "stdout", "stderr", "system"] as const).map(
+                  (stream) => (
+                    <button
+                      key={stream}
+                      type="button"
+                      role="tab"
+                      aria-selected={streamFilter === stream}
+                      onClick={() => setStreamFilter(stream)}
+                      className={cn(
+                        "rounded px-2 py-0.5 font-mono text-[10px] uppercase transition-colors",
+                        streamFilter === stream
+                          ? "bg-white/15 text-white"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      )}
+                    >
+                      {stream}
+                    </button>
+                  )
+                )}
+              </div>
+              {filteredLogs.length > 0 ? (
+                <CopyButton
+                  value={rawLogsText}
+                  label="Copy"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white"
+                />
+              ) : null}
+            </div>
           </div>
 
           {shouldPoll ? (
@@ -208,12 +398,12 @@ export function DeploymentLiveView({
             </p>
           ) : null}
 
-          {logs.length ? (
+          {filteredLogs.length ? (
             <div
               className="max-h-[36rem] overflow-auto p-4 sm:p-5"
               aria-label="Build log output"
             >
-              {logs.map((log) => (
+              {filteredLogs.map((log) => (
                 <div
                   key={log.id}
                   className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-3 py-1 font-mono text-xs sm:grid-cols-[28px_58px_minmax(0,1fr)]"
@@ -241,9 +431,13 @@ export function DeploymentLiveView({
             </div>
           ) : (
             <div className="px-5 py-14 text-center">
-              <h3 className="text-sm font-medium text-zinc-200">No logs yet</h3>
+              <h3 className="text-sm font-medium text-zinc-200">
+                {logs.length ? "No matching log lines" : "No logs yet"}
+              </h3>
               <p className="mt-2 text-xs leading-6 text-zinc-400">
-                Build output will appear here as the deployment progresses.
+                {logs.length
+                  ? `No ${streamFilter} lines recorded for this deployment.`
+                  : "Build output will appear here as the deployment progresses."}
               </p>
             </div>
           )}
@@ -273,6 +467,10 @@ export function DeploymentLiveView({
             <dd className="mt-1 font-mono break-all text-foreground">
               {deployment.id}
             </dd>
+          </div>
+          <div className="py-3">
+            <dt className="text-[11px] text-muted-foreground">Duration</dt>
+            <dd className="mt-1 font-mono text-foreground">{duration}</dd>
           </div>
           <div className="py-3">
             <dt className="text-[11px] text-muted-foreground">Created</dt>

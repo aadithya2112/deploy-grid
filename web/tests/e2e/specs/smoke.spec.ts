@@ -82,6 +82,42 @@ test("deployment page renders ready logs for an existing deployment", async ({
   await expect(page.getByText("abc123def456")).toBeVisible()
 })
 
+test("project page supports direct site visit, settings edits, env vars, and custom branch deploys", async ({
+  page,
+}) => {
+  await page.goto("/projects/project-ready")
+
+  await expect(
+    page.getByRole("link", { name: "Visit site", exact: true })
+  ).toHaveAttribute("href", "https://preview.example.com/deployment-ready")
+
+  await page.getByRole("button", { name: "Edit", exact: true }).click()
+  await page.getByLabel("Build command").fill("bun run build")
+  await page.getByRole("button", { name: "Save settings" }).click()
+  await expect(page.getByRole("status")).toContainText("Build settings updated")
+  await expect(page.getByText("bun run build")).toBeVisible()
+
+  await page.getByRole("button", { name: "Add variable" }).click()
+  await page.getByLabel("Key").fill("VITE_PUBLIC_MODE")
+  await page.getByLabel("Value").fill("staging-1234")
+  await page.getByRole("button", { name: "Save variable" }).click()
+  await expect(page.getByRole("status")).toContainText("Saved VITE_PUBLIC_MODE")
+  await expect(
+    page.getByText("VITE_PUBLIC_MODE", { exact: true })
+  ).toBeVisible()
+
+  await page.getByRole("button", { name: "Delete VITE_PUBLIC_MODE" }).click()
+  await expect(page.getByRole("status")).toContainText(
+    "Deleted VITE_PUBLIC_MODE"
+  )
+
+  await page.getByRole("button", { name: "Deploy ref" }).click()
+  await page.getByLabel("Branch, tag, or commit SHA").fill("release/v2")
+  await page.getByRole("button", { name: "Start deployment" }).click()
+  await expect(page).toHaveURL(/\/projects\/project-ready\/deployments\/deployment-created-/)
+  await expect(page.getByText("release/v2").first()).toBeVisible()
+})
+
 test("release management promotes a retained build and exposes production", async ({
   page,
 }) => {
